@@ -191,7 +191,7 @@ const run = async () => {
   // —— T10 ch2-02..07 双 rep 连续通关（N=2） ——
   const ch2Pars = {
     'ch2-02': 'weas<Esc>wwweas<Esc>',
-    'ch2-03': '^i- <Esc>$xj$x',
+    'ch2-03': '^i- <Esc>$xjx',
     'ch2-04': '4ggyyGp2ggdd',
     'ch2-05': 'fxx;x;x',
     'ch2-06': 'yyGp2ggdd$a!<Esc>',
