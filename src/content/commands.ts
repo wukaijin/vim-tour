@@ -231,6 +231,63 @@ export const COMMANDS: CommandMeta[] = [
     example: { keys: ',', effect: '往回找上一个匹配字符' },
     chapter: 2,
   },
+
+  // ========== 第 3 章 · 操作符+移动（PLAN §4） ==========
+  {
+    id: 'd',
+    keys: 'd{motion}',
+    mode: 'normal',
+    desc: '删除操作符：d 后面接一个移动命令，删掉从光标到目标的文本。dw 删一个词，d$ 删到行尾。',
+    example: { keys: 'dw', effect: '删掉光标所在的整个词（含词尾空格）' },
+    seqs: ['dw', 'de', 'db', 'd0', 'd$', 'd^', 'dj', 'dk', 'dG', 'dgg', 'df', 'dF', 'dt', 'dT'],
+    pattern: /^(?:[1-9][0-9]*)?d(?:[1-9][0-9]*)?(?:dd|w|e|b|0|\$|\^|j|k|G|gg|f|F|t|T)/,
+    chapter: 3,
+  },
+  {
+    id: 'c',
+    keys: 'c{motion}',
+    mode: 'normal',
+    desc: '修改操作符：像 d 一样删到目标，但删完直接进入插入模式。cw = 改一个词。',
+    example: { keys: 'cwnew<Esc>', effect: '把当前词改成 new' },
+    seqs: ['cw', 'ce', 'cb', 'c0', 'c$', 'c^', 'cj', 'ck', 'cc', 'cG', 'cgg', 'cf', 'cF', 'ct', 'cT'],
+    pattern: /^(?:[1-9][0-9]*)?c(?:[1-9][0-9]*)?(?:cc|w|e|b|0|\$|\^|j|k|G|gg|f|F|t|T)/,
+    chapter: 3,
+  },
+  {
+    id: 'y',
+    keys: 'y{motion}',
+    mode: 'normal',
+    desc: '复制操作符（yank）：像 d 一样圈定范围，但不删，抄进寄存器。yw 复制一个词。',
+    example: { keys: 'ywp', effect: '复制当前词并贴在后面' },
+    seqs: ['yw', 'ye', 'yb', 'y0', 'y$', 'y^', 'yj', 'yk', 'yG', 'ygg', 'yf', 'yF', 'yt', 'yT'],
+    pattern: /^(?:[1-9][0-9]*)?y(?:[1-9][0-9]*)?(?:yy|w|e|b|0|\$|\^|j|k|G|gg|f|F|t|T)/,
+    chapter: 3,
+  },
+  {
+    id: 'J',
+    keys: 'J',
+    mode: 'normal',
+    desc: '把下一行接到本行末尾（join），两行变一行，中间自动补一个空格。',
+    example: { keys: 'J', effect: '当前行与下一行合并成一行' },
+    chapter: 3,
+  },
+  {
+    id: 'dot',
+    keys: '.',
+    mode: 'normal',
+    desc: '重复上一次修改。同样的修改要做几次：做一次，然后按 . 就好。',
+    example: { keys: 'dw..', effect: '删一个词，再连删两个（共三个）' },
+    chapter: 3,
+  },
+  {
+    id: 'count',
+    keys: '2dd',
+    mode: 'normal',
+    desc: '计数前缀：数字放在命令前让它重复 n 次——2dd 删两行、3w 跳三个词、d2w 删两个词。',
+    example: { keys: '2dd', effect: '一次删掉两行' },
+    pattern: /^[1-9][0-9]*(?:dd|dw|de|cw|cc|yy|yw|j|k|w|b|e|x|gg|G|J)$/,
+    chapter: 3,
+  },
 ]
 
 const byId = new Map(COMMANDS.map((c) => [c.id, c]))

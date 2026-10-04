@@ -46,8 +46,8 @@ export function validateLevels(levels: Level[]): ValidationIssue[] {
     if (level.texts.length < 1 || level.texts.length > 2) {
       push('shape', `texts 变体数应为 1–2（MVP 上限 ×2），实际 ${level.texts.length}`)
     }
-    if (level.chapter === 2 && level.texts.length !== 2) {
-      push('variant-count', 'ch2 关卡必须全量配 2 个变体（PLAN §11.2：不可砍）')
+    if (level.chapter >= 2 && level.texts.length !== 2) {
+      push('variant-count', `ch${level.chapter} 关卡必须全量配 2 个变体（PLAN §11.2/§2.4B）`)
     }
     if (!level.hints[0] || !level.hints[1]) {
       push('shape', 'hints 需要两级非空文案')

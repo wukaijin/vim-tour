@@ -77,6 +77,14 @@ describe('ch3 操作符 + 运动', () => {
     expect(r.lines).toEqual(['foo bar ', 'qux quux corge', 'grault garply waldo'])
   })
 
+  it('最后一行的行尾词：w 目标为行尾，dw/yw 不落空', () => {
+    // vim：没有下一行可跳时 w 前进到行尾，操作符按「删/抄到行尾」结算
+    expect(run(['one two'], 'w', { line: 0, col: 4 }).cursor).toEqual({ line: 0, col: 6 })
+    expect(run(['one two'], 'dw', { line: 0, col: 4 }).lines).toEqual(['one '])
+    expect(run(TEXT, 'dw', { line: 2, col: 14 }).lines[2]).toBe('grault garply ')
+    expect(run(['one two'], 'wyw$p', { line: 0, col: 0 }).lines).toEqual(['one twotwo'])
+  })
+
   it('d2w / d$ / d0 / de / db', () => {
     expect(run(TEXT, 'd2w').lines[0]).toBe('baz')
     expect(run(TEXT, 'd$', { line: 0, col: 4 }).lines[0]).toBe('foo ')

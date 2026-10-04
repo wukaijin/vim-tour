@@ -134,7 +134,11 @@ function wordStartFwd(lines: string[], cur: Cursor, count: number): MotionResult
   let p: Cursor | null = { ...cur }
   for (let i = 0; i < count; i++) {
     const q = wordStartFwdOnce(lines, p)
-    if (!q) return { target: clampCursor(lines, p), kind: 'exclusive' }
+    if (!q) {
+      // 没有下一个词可跳（最后一行）：vim 的 w 前进到行尾，
+      // 让 operator 按「到行尾」结算——落在原地会让 dw/yw 落空
+      return { target: { line: p.line, col: lines[p.line].length }, kind: 'exclusive' }
+    }
     p = q
   }
   return { target: p, kind: 'exclusive' }

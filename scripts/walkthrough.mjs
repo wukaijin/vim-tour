@@ -45,13 +45,13 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 8000 })
   await page.waitForTimeout(600)
   const nodeCount = await page.locator('.node').count()
-  nodeCount === 14 ? ok('T1 地图渲染 14 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
+  nodeCount === 21 ? ok('T1 地图渲染 21 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
   const currentCount = await page.locator('.node.current').count()
   currentCount === 1 && (await page.locator('.node.current .n-no').textContent()) === '1'
     ? ok('T1 ch1-01 为 current')
     : fail('T1 current 节点', `current 数 ${currentCount}`)
-  const ch2Locked = await page.locator('.ch-lock').count()
-  ch2Locked === 1 ? ok('T1 ch2 整章锁定提示') : fail('T1 ch2 锁定提示', `ch-lock 数 ${ch2Locked}`)
+  const lockCount = await page.locator('.ch-lock').count()
+  lockCount === 2 ? ok('T1 ch2/ch3 整章锁定提示') : fail('T1 章节锁定提示', `ch-lock 数 ${lockCount}`)
   const warmupBar = await page.locator('.warmup').count()
   warmupBar === 0 ? ok('T1 无 due 时不出热身条') : fail('T1 热身条', '不应出现')
   await shot(page, 't01-map-initial')
@@ -143,15 +143,15 @@ const run = async () => {
   const gradNote = await page.locator('.t-grad').count()
   gradNote === 1 ? ok('T6 毕业考结算含批量清关说明') : fail('T6 毕业考说明', '缺失')
 
-  // —— T7 ch2 解锁 ——
+  // —— T7 ch2 解锁（ch3 仍锁定） ——
   await page.getByRole('button', { name: '回到地图' }).click()
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
-  const ch2Unlock = await page.locator('.ch-lock').count()
-  ch2Unlock === 0 ? ok('T7 ch2 已解锁（锁定提示消失）') : fail('T7 ch2 解锁', '仍锁定')
+  const locks = await page.locator('.ch-lock').count()
+  locks === 1 ? ok('T7 ch2 已解锁，ch3 仍锁定') : fail('T7 章节锁', `ch-lock 数 ${locks}`)
   const doneAll = await page.locator('.node.done').count()
   doneAll === 7 ? ok('T7 ch1 全部 7 关 done') : fail('T7 ch1 done 数', `${doneAll}`)
-  await shot(page, 't11-map-ch2-unlocked', )
+  await shot(page, 't11-map-ch2-unlocked')
 
   // —— T8 ch2-01：N=2 双 rep ——
   await page.locator('.node.current').click()
@@ -187,6 +187,57 @@ const run = async () => {
     ? ok('T9 提示②显示完整解法')
     : fail('T9 提示②', hint2text)
   await shot(page, 't14-hints')
+
+  // —— T10 ch2-02..07 双 rep 连续通关（N=2） ——
+  const ch2Pars = {
+    'ch2-02': 'weas<Esc>wwweas<Esc>',
+    'ch2-03': '^i- <Esc>$xj$x',
+    'ch2-04': '4ggyyGp2ggdd',
+    'ch2-05': 'fxx;x;x',
+    'ch2-06': 'yyGp2ggdd$a!<Esc>',
+    'ch2-07': '0xxfxxj$a;<Esc>j$a!<Esc>',
+  }
+  for (const [id, par] of Object.entries(ch2Pars)) {
+    await press(page, par)
+    await page.waitForTimeout(500)
+    await press(page, par)
+    const cleared = await page
+      .waitForSelector('.ticket', { timeout: 3000 })
+      .then(() => true)
+      .catch(() => false)
+    cleared ? ok(`T10 ${id} 双 rep 通关`) : fail(`T10 ${id}`, '未出现结算屏')
+    if (id !== 'ch2-07') {
+      await page.getByRole('button', { name: '下一关' }).click()
+      await page.waitForSelector('.play', { timeout: 3000 })
+      if (await page.locator('.card').count()) await page.keyboard.press('Escape')
+      await page.waitForTimeout(150)
+    }
+  }
+  await shot(page, 't15-result-ch2-grad')
+
+  // —— T11 ch3 解锁 + ch3-01 教学卡与双 rep ——
+  await page.getByRole('button', { name: '回到地图' }).click()
+  await page.waitForSelector('.chapter', { timeout: 3000 })
+  await page.waitForTimeout(300)
+  const locks2 = await page.locator('.ch-lock').count()
+  locks2 === 0 ? ok('T11 ch3 已解锁（锁定提示消失）') : fail('T11 ch3 解锁', `ch-lock 数 ${locks2}`)
+  const doneAll2 = await page.locator('.node.done').count()
+  doneAll2 === 14 ? ok('T11 ch1+ch2 全部 14 关 done') : fail('T11 done 数', `${doneAll2}`)
+  await shot(page, 't16-map-ch3-unlocked')
+
+  await page.locator('.node.current').click()
+  await page.waitForSelector('.card', { timeout: 3000 })
+  const ch3Card = await page.locator('.card .cmds > li').count()
+  ch3Card === 1 ? ok('T11 ch3-01 教学卡展示 1 个新命令(d)') : fail('T11 ch3-01 卡命令数', `${ch3Card}`)
+  await shot(page, 't17-card-ch3-d')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  await press(page, 'dwdw')
+  await page.waitForTimeout(500)
+  await press(page, 'dwdw')
+  await page.waitForSelector('.ticket', { timeout: 3000 })
+  await shot(page, 't18-result-ch3-01')
+  ok('T11 ch3-01 两轮连击通关')
 
   await browser.close()
 }

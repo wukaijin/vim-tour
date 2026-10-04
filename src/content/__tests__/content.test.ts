@@ -9,10 +9,11 @@ import { validateLevels } from '../validate'
 const here = dirname(fileURLToPath(import.meta.url))
 
 /** 把 issue 定位到源文件行号（PLAN §9.3：信息指到行号） */
-function withLineNumbers(issues: ReturnType<typeof validateLevels>) {
+function withLineNumbers(levels: Level[], issues: ReturnType<typeof validateLevels>) {
+  const chapterIds = [...new Set(levels.map((l) => l.chapter))].sort((a, b) => a - b)
   const sources = new Map(
-    ['ch1', 'ch2'].map((ch) => {
-      const path = resolve(here, `../chapters/${ch}.ts`)
+    chapterIds.map((ch) => {
+      const path = resolve(here, `../chapters/ch${ch}.ts`)
       return [path, readFileSync(path, 'utf8')] as const
     }),
   )
@@ -33,9 +34,14 @@ function withLineNumbers(issues: ReturnType<typeof validateLevels>) {
 describe('内容校验器（PLAN §9.3 构建期五断言）', async () => {
   const levels = await loadAllLevels()
 
-  it('关卡总量在 MVP 范围（10–14）', () => {
+  it('关卡总量 ≥ 10，每章 4–8 关 + 1 毕业考（PLAN §4）', () => {
     expect(levels.length).toBeGreaterThanOrEqual(10)
-    expect(levels.length).toBeLessThanOrEqual(14)
+    const byChapter = new Map<number, Level[]>()
+    for (const l of levels) byChapter.set(l.chapter, [...(byChapter.get(l.chapter) ?? []), l])
+    for (const [ch, ls] of byChapter) {
+      expect(ls.length, `ch${ch} 关数（含毕业考）`).toBeGreaterThanOrEqual(5)
+      expect(ls.length, `ch${ch} 关数（含毕业考）`).toBeLessThanOrEqual(9)
+    }
   })
 
   it('每章最后一关是毕业考，其余不是', () => {
@@ -48,12 +54,12 @@ describe('内容校验器（PLAN §9.3 构建期五断言）', async () => {
   })
 
   it('五断言全部通过（含 parKeys 走真引擎收敛）', () => {
-    const issues = withLineNumbers(validateLevels(levels))
+    const issues = withLineNumbers(levels, validateLevels(levels))
     expect(issues).toEqual([])
   })
 
-  it('ch2 每关恰好 2 个变体（不可砍，PLAN §11.2）', () => {
-    for (const l of levels.filter((x) => x.chapter === 2)) {
+  it('ch2 起每关恰好 2 个变体（不可砍，PLAN §11.2/§2.4B）', () => {
+    for (const l of levels.filter((x) => x.chapter >= 2)) {
       expect(l.texts.length, `${l.id}`).toBe(2)
     }
   })
