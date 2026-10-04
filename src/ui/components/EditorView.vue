@@ -165,11 +165,29 @@ const modeLabel: Record<Mode, string> = {
   text-align: center;
 }
 
+/* 竖线占满字符位：字符以正常墨色经 ::after 渲染，线由 ::before 叠在左缘 */
 .cursor.bar {
-  width: 2px;
+  position: relative;
+  width: 1ch;
   height: 1.45em;
+}
+
+.cursor.bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
   background: var(--brand-ink);
   animation: cursor-blink 1.06s steps(1) infinite;
+}
+
+.cursor.bar::after {
+  content: attr(data-ch);
+  position: absolute;
+  inset: 0;
+  color: inherit;
 }
 
 @keyframes cursor-blink {
@@ -180,7 +198,7 @@ const modeLabel: Record<Mode, string> = {
 
 @media (prefers-reduced-motion: reduce) {
   .cursor.block,
-  .cursor.bar {
+  .cursor.bar::before {
     animation: none;
   }
 }
