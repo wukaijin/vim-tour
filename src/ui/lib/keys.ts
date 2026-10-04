@@ -1,0 +1,55 @@
+import type { Key } from '../../engine'
+
+/** 与 KeyboardEvent 结构兼容的最小接口（node 环境可测） */
+export interface KeyEventLike {
+  key: string
+  ctrlKey: boolean
+  metaKey: boolean
+  altKey: boolean
+  isComposing: boolean
+}
+
+/**
+ * 键盘事件 → 引擎 Key token。
+ * 可打印单字符直通；命名键映射为尖括号形式；方向键刻意忽略（vim 用 hjkl）；
+ * IME 组合期间不产生按键。
+ */
+export function eventToKey(e: KeyEventLike): Key | null {
+  if (e.isComposing) return null
+  if (e.ctrlKey || e.metaKey || e.altKey) {
+    return e.key === 'r' && (e.ctrlKey || e.metaKey) ? '<C-r>' : null
+  }
+  switch (e.key) {
+    case 'Enter':
+      return '<CR>'
+    case 'Backspace':
+      return '<BS>'
+    case 'Tab':
+      return '<Tab>'
+    case 'Escape':
+      return '<Esc>'
+  }
+  if (e.key.length === 1) return e.key
+  return null
+}
+
+/** 该事件是否应被对局屏吃掉（阻止浏览器默认行为，如 / 快速查找、Tab 焦点移动） */
+export function isGameplayKey(e: KeyEventLike): boolean {
+  return eventToKey(e) !== null
+}
+
+/** 焦点在交互元素上时，按钮激活键要放行给浏览器，避免杀死键盘可达性 */
+const ACTIVATION_KEYS = new Set(['Enter', ' ', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
+
+export function shouldBypassCapture(e: KeyEventLike, target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  const interactive =
+    !!el &&
+    (el.tagName === 'BUTTON' ||
+      el.tagName === 'A' ||
+      el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.tagName === 'SELECT' ||
+      el.isContentEditable)
+  return interactive && ACTIVATION_KEYS.has(e.key)
+}

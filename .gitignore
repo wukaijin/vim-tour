@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+.DS_Store
+coverage
+tsconfig.tsbuildinfo
+gui-test-screenshots

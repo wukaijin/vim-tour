@@ -1,0 +1,145 @@
+/* ============================================================
+   vim-tour 设计 token（PLAN §8：键帽母题 · 硬偏移阴影 · 暖中性色板）
+   禁令内建：无模糊投影、无 linear 缓动、无大面积章节色背景。
+   ============================================================ */
+:root {
+  /* —— 色板（§8.2）—— */
+  --paper: #f6f4ee;
+  --surface: #fffdf8;
+  --edge: #e4dfd2;
+  --ink: #2b2a26;
+  --ink-2: #6b675c;
+  --brand: #06b6d4;
+  --brand-ink: #0e7490;
+  --ok: #22c55e;
+  --ok-ink: #15803d;
+  --ok-fill: #dcfce7;
+  --err: #ef4444;
+  --err-ink: #dc2626;
+  --err-fill: #fee2e2;
+  --warn: #f59e0b;
+  --warn-ink: #b45309;
+  --warn-fill: #fef3c7;
+  --star: #eab308;
+  --star-fill: #fef9c3;
+
+  /* —— 字号阶梯（§8.3）—— */
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-base: 16px;
+  --fs-lg: 20px;
+  --fs-xl: 28px;
+  --fs-2xl: 40px;
+
+  /* —— 圆角阶梯（§8.1）—— */
+  --r-keycap: 6px;
+  --r-input: 14px;
+  --r-card: 20px;
+  --r-node: 10px;
+
+  /* —— 硬阴影仅两档（§8.1）—— */
+  --shadow-1: 0 3px 0 var(--edge);
+  --shadow-2: 0 6px 0 var(--edge);
+
+  /* —— 动效（§8.5）—— */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* —— 字体栈（§8.3：拉丁 webfont + 中文系统栈）—— */
+  --font-ui:
+    'Nunito Variable', 'HarmonyOS Sans SC', 'Source Han Sans SC', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  --font-display: 'Fredoka Variable', 'Nunito Variable', var(--font-ui);
+  --font-mono:
+    'IBM Plex Mono', 'HarmonyOS Sans SC', 'Source Han Sans SC', 'PingFang SC',
+    ui-monospace, monospace;
+
+  /* —— 间距基线 4px —— */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* —— 章节色 ramp（§8.2：cyan 7 档，浅→深 = 易→难）—— */
+  --ch1: #cffafe;
+  --ch2: #a5f3fc;
+  --ch3: #67e8f9;
+  --ch4: #22d3ee;
+  --ch5: #06b6d4;
+  --ch6: #0891b2;
+  --ch7: #0e7490;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* 焦点环：outline 跟随 border-radius、不触发重排（§8.5） */
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* —— reduced-motion 降级：transform 动画 → 120ms 淡入（§8.5）—— */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 120ms !important;
+    animation-timing-function: ease-out !important;
+    transition-duration: 120ms !important;
+    transition-property: opacity !important;
+  }
+}

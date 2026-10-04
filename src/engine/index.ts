@@ -1,0 +1,8 @@
+export * from './types'
+export * from './motions'
+export { textObject } from './textobjects'
+export { Registers } from './registers'
+export { VimEngine } from './engine'
+export { KeyFilter } from './whitelist'
+export { findNext, wordUnderCursorPattern, compilePattern } from './search'
+export { parseSubstitute, substituteLine } from './ex'

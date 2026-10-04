@@ -1,0 +1,31 @@
+/* 只引 latin 子集（PLAN §10.5：中文一律系统栈，不进 woff2 棘轮）。
+   变量字体的官方包未提供 latin-only CSS 入口，这里手写 @font-face 直引
+   包内 latin woff2，等价于 latin.css 的效果。 */
+@font-face {
+  font-family: 'Nunito Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 1000;
+  src: url('../../../node_modules/@fontsource-variable/nunito/files/nunito-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Fredoka Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url('../../../node_modules/@fontsource-variable/fredoka/files/fredoka-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+/* IBM Plex Mono 静态 400：官方包 latin-400.css 会带 .woff 回退，
+   这里只引 woff2（资源白名单仅允许 woff2，PLAN §10.1） */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../../../node_modules/@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2')
+    format('woff2');
+}
