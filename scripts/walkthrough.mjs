@@ -45,13 +45,13 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 8000 })
   await page.waitForTimeout(600)
   const nodeCount = await page.locator('.node').count()
-  nodeCount === 21 ? ok('T1 地图渲染 21 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
+  nodeCount === 28 ? ok('T1 地图渲染 28 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
   const currentCount = await page.locator('.node.current').count()
   currentCount === 1 && (await page.locator('.node.current .n-no').textContent()) === '1'
     ? ok('T1 ch1-01 为 current')
     : fail('T1 current 节点', `current 数 ${currentCount}`)
   const lockCount = await page.locator('.ch-lock').count()
-  lockCount === 2 ? ok('T1 ch2/ch3 整章锁定提示') : fail('T1 章节锁定提示', `ch-lock 数 ${lockCount}`)
+  lockCount === 3 ? ok('T1 ch2/ch3/ch4 整章锁定提示') : fail('T1 章节锁定提示', `ch-lock 数 ${lockCount}`)
   const warmupBar = await page.locator('.warmup').count()
   warmupBar === 0 ? ok('T1 无 due 时不出热身条') : fail('T1 热身条', '不应出现')
   await shot(page, 't01-map-initial')
@@ -143,12 +143,12 @@ const run = async () => {
   const gradNote = await page.locator('.t-grad').count()
   gradNote === 1 ? ok('T6 毕业考结算含批量清关说明') : fail('T6 毕业考说明', '缺失')
 
-  // —— T7 ch2 解锁（ch3 仍锁定） ——
+  // —— T7 ch2 解锁（ch3/ch4 仍锁定） ——
   await page.getByRole('button', { name: '回到地图' }).click()
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
   const locks = await page.locator('.ch-lock').count()
-  locks === 1 ? ok('T7 ch2 已解锁，ch3 仍锁定') : fail('T7 章节锁', `ch-lock 数 ${locks}`)
+  locks === 2 ? ok('T7 ch2 已解锁，ch3/ch4 仍锁定') : fail('T7 章节锁', `ch-lock 数 ${locks}`)
   const doneAll = await page.locator('.node.done').count()
   doneAll === 7 ? ok('T7 ch1 全部 7 关 done') : fail('T7 ch1 done 数', `${doneAll}`)
   await shot(page, 't11-map-ch2-unlocked')
@@ -215,12 +215,12 @@ const run = async () => {
   }
   await shot(page, 't15-result-ch2-grad')
 
-  // —— T11 ch3 解锁 + ch3-01 教学卡与双 rep ——
+  // —— T11 ch3 解锁（ch4 仍锁定）+ ch3-01 教学卡与双 rep ——
   await page.getByRole('button', { name: '回到地图' }).click()
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
   const locks2 = await page.locator('.ch-lock').count()
-  locks2 === 0 ? ok('T11 ch3 已解锁（锁定提示消失）') : fail('T11 ch3 解锁', `ch-lock 数 ${locks2}`)
+  locks2 === 1 ? ok('T11 ch3 已解锁（ch4 仍锁定）') : fail('T11 ch3 解锁', `ch-lock 数 ${locks2}`)
   const doneAll2 = await page.locator('.node.done').count()
   doneAll2 === 14 ? ok('T11 ch1+ch2 全部 14 关 done') : fail('T11 done 数', `${doneAll2}`)
   await shot(page, 't16-map-ch3-unlocked')
@@ -238,6 +238,64 @@ const run = async () => {
   await page.waitForSelector('.ticket', { timeout: 3000 })
   await shot(page, 't18-result-ch3-01')
   ok('T11 ch3-01 两轮连击通关')
+
+  // —— T12 ch3-02..07 双 rep 连续通关（N=2） ——
+  const ch3Pars = {
+    'ch3-02': 'f/hd$j0wd0',
+    'ch3-03': 'wcwnew<Esc>',
+    'ch3-04': 'wyw$a <Esc>p',
+    'ch3-05': 'Jj2dd',
+    'ch3-06': 'd2w.',
+    'ch3-07': 'ddwcwnew<Esc>jJ',
+  }
+  for (const [id, par] of Object.entries(ch3Pars)) {
+    if (await page.locator('.ticket').count()) {
+      await page.getByRole('button', { name: '下一关' }).click()
+    } else {
+      await page.locator('.node.current').click()
+    }
+    await page.waitForSelector('.play', { timeout: 3000 })
+    if (await page.locator('.card').count()) await page.keyboard.press('Escape')
+    await page.waitForTimeout(150)
+    await press(page, par)
+    await page.waitForTimeout(500)
+    await press(page, par)
+    const cleared = await page
+      .waitForSelector('.ticket', { timeout: 3000 })
+      .then(() => true)
+      .catch(() => false)
+    cleared ? ok(`T12 ${id} 双 rep 通关`) : fail(`T12 ${id}`, '未出现结算屏')
+  }
+  await shot(page, 't19-result-ch3-grad')
+
+  // —— T13 ch4 解锁 + ch4-01 教学卡与 N=3 三连击 ——
+  await page.getByRole('button', { name: '回到地图' }).click()
+  await page.waitForSelector('.chapter', { timeout: 3000 })
+  await page.waitForTimeout(300)
+  const locks3 = await page.locator('.ch-lock').count()
+  locks3 === 0 ? ok('T13 ch4 已解锁（锁定提示消失）') : fail('T13 ch4 解锁', `ch-lock 数 ${locks3}`)
+  const doneAll3 = await page.locator('.node.done').count()
+  doneAll3 === 21 ? ok('T13 ch1–ch3 全部 21 关 done') : fail('T13 done 数', `${doneAll3}`)
+  await shot(page, 't20-map-ch4-unlocked')
+
+  await page.locator('.node.current').click()
+  await page.waitForSelector('.card', { timeout: 3000 })
+  const ch4Card = await page.locator('.card .cmds > li').count()
+  ch4Card === 1 ? ok('T13 ch4-01 教学卡展示 1 个新命令(iw)') : fail('T13 ch4-01 卡命令数', `${ch4Card}`)
+  await shot(page, 't21-card-ch4-iw')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  await press(page, 'ciwnew<Esc>')
+  await page.waitForTimeout(600)
+  const rep1 = await page.locator('.toast').innerText().catch(() => '')
+  rep1.includes('1/3') ? ok('T13 ch4 首轮成功显示 1/3（N=3）') : fail('T13 首轮反馈', rep1)
+  await shot(page, 't22-ch4-rep1')
+  await press(page, 'ciwnew<Esc>')
+  await page.waitForTimeout(500)
+  await press(page, 'ciwnew<Esc>')
+  await page.waitForSelector('.ticket', { timeout: 3000 })
+  await shot(page, 't23-result-ch4-01')
+  ok('T13 ch4-01 三轮连击通关')
 
   await browser.close()
 }

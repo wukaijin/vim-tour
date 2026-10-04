@@ -18,6 +18,7 @@ export const CHAPTERS: ChapterMeta[] = [
   { id: 1, title: '生存', subtitle: '模式概念 · 增删改的基础键', color: RAMP[0], inkBorder: true },
   { id: 2, title: '词与行移动', subtitle: '在大文件里跑起来', color: RAMP[1], inkBorder: true },
   { id: 3, title: '操作符与移动', subtitle: 'd c y · 计数 · 重复', color: RAMP[2], inkBorder: true },
+  { id: 4, title: '文本对象', subtitle: 'iw aw · i( i" · it ip', color: RAMP[3], inkBorder: true },
 ]
 
 export function chapterMeta(id: number): ChapterMeta | undefined {
