@@ -7,6 +7,7 @@ import { useGameStore } from '../stores/game'
 import EditorView from '../components/EditorView.vue'
 import TargetDiff from '../components/TargetDiff.vue'
 import KeyEchoBar from '../components/KeyEchoBar.vue'
+import KeyGlyph from '../components/KeyGlyph.vue'
 import StreakLamps from '../components/StreakLamps.vue'
 import TeachingCard from '../components/TeachingCard.vue'
 import ToastItem from '../components/ToastItem.vue'
@@ -117,36 +118,68 @@ onBeforeUnmount(() => {
 
 <template>
   <div v-if="level" ref="rootEl" class="play" tabindex="-1">
-    <!-- 工具行：提示按钮是本屏首个可聚焦元素（§8.5 硬条款） -->
+    <!-- 工具行：提示按钮是本屏首个可聚焦元素（§8.5 硬条款）。
+         每个按钮都是一枚键帽（§8.1）：face 承载底色与字形，::before 是底部实边，
+         按下整体沉 2px、底边随之变矮——与 Keycap.vue 同一套物理。 -->
     <div class="toolbar">
       <div class="tool-left">
-        <button
-          ref="hintBtn"
-          class="tool hint1"
-          @click="game.useHint(1); reclaimFocus()"
-        >
-          提示 · 方向
+        <button ref="hintBtn" class="tool hint1" @click="game.useHint(1); reclaimFocus()">
+          <span class="face">
+            <!-- 字形槽即状态灯：?=可看、✓=已看过。槽定宽，切换不推动邻键 -->
+            <span class="slot">
+              <KeyGlyph v-if="game.hintStage >= 1" name="check" :size="14" />
+              <span v-else class="glyph" aria-hidden="true">?</span>
+            </span>
+            <span class="label">提示 · 方向</span>
+          </span>
         </button>
+        <!-- 解法提示扣星：价签用 −2 + 星形双通道；未解锁时是锁形（灰键面） -->
         <button class="tool hint2" :disabled="game.hintStage < 1" @click="game.useHint(2); reclaimFocus()">
-          提示 · 解法 <span class="warn">−2★</span>
+          <span class="face">
+            <span class="slot">
+              <KeyGlyph v-if="game.hintStage < 1" name="lock" :size="13" />
+              <KeyGlyph v-else-if="game.hintStage >= 2" name="check" :size="14" />
+              <span v-else class="glyph" aria-hidden="true">?</span>
+            </span>
+            <span class="label">提示 · 解法</span>
+            <span class="cost" aria-label="扣 2 星">
+              <span aria-hidden="true">−2</span>
+              <KeyGlyph name="star" :size="11" />
+            </span>
+          </span>
         </button>
-        <button class="tool restart" @click="onRestart()">重来</button>
+        <button class="tool restart" @click="onRestart()">
+          <span class="face">
+            <span class="slot"><span class="glyph" aria-hidden="true">↺</span></span>
+            <span class="label">重来</span>
+          </span>
+        </button>
         <button
           v-if="teachCards.length && !game.warmup"
           class="tool teach"
           @click="game.reopenCard(); reclaimFocus()"
         >
-          教学卡
+          <span class="face">
+            <span class="slot"><span class="glyph" aria-hidden="true">▤</span></span>
+            <span class="label">教学卡</span>
+          </span>
         </button>
       </div>
       <div class="tool-right">
         <div v-if="game.warmup" class="warmup-chip">
-          <span>热身 {{ warmupIndex }}/{{ warmupTotal }}</span>
+          <span class="warmup-label">热身 {{ warmupIndex }}/{{ warmupTotal }}</span>
           <span class="mono timer" :class="{ low: warmupSeconds <= 10 }">{{ warmupSeconds }}s</span>
-          <button class="tool skip" @click="game.finishWarmup()">跳过热身</button>
+          <button class="tool compact" @click="game.finishWarmup()">
+            <span class="face"><span class="label">跳过热身</span></span>
+          </button>
         </div>
         <StreakLamps v-else :k="game.streak" :n="game.requiredStreak" />
-        <button class="tool back" @click="game.gotoMap(); reclaimFocus()">返回地图</button>
+        <button class="tool back" @click="game.gotoMap(); reclaimFocus()">
+          <span class="face">
+            <span class="slot"><span class="glyph" aria-hidden="true">←</span></span>
+            <span class="label">返回地图</span>
+          </span>
+        </button>
       </div>
     </div>
 
@@ -224,6 +257,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
+  /* 窄窗口下右簇换行而不是溢出（键面变宽后的防线，1280 下无影响） */
+  flex-wrap: wrap;
+  row-gap: var(--sp-2);
 }
 
 .tool-left {
@@ -238,42 +274,132 @@ onBeforeUnmount(() => {
 }
 
 .tool {
-  border: 1px solid var(--edge);
-  background: var(--surface);
+  /* 三档语义键帽：plain（默认）/ brand（免费方向提示）/ warn（扣星解法）。
+     fill/edge/ink 成对，与 §8.2 语义色双档、Keycap.vue 的 tone 同源 */
+  --tk-face: var(--surface);
+  --tk-edge: #cfc8b6;
+  --tk-ink: var(--ink);
+  position: relative;
+  display: inline-flex;
+  border: none;
+  background: none;
+  padding: 0;
   border-radius: var(--r-keycap);
-  padding: var(--sp-1) var(--sp-3);
+  color: var(--tk-ink);
   font-size: var(--fs-sm);
-  box-shadow: var(--shadow-1);
   transition: transform var(--dur-fast) var(--ease-out);
 }
 
-.tool:active {
-  transform: translateY(2px);
-  box-shadow: none;
+/* 底部 3px 实色边：块在 face 之后、下移 3px（与 Keycap.vue 同构） */
+.tool::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateY(3px);
+  border-radius: inherit;
+  background: var(--tk-edge);
+  transition: transform var(--dur-fast) var(--ease-out);
 }
 
+.tool .face {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  border-radius: inherit;
+  background: var(--tk-face);
+  /* 顶部 1px 高光（§8.1） */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tool svg {
+  flex: none;
+}
+
+/* 悬停：整键轻抬 1px + 键面压深一阶（不 transition box-shadow） */
+.tool:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.tool:not(:disabled):hover .face {
+  background: color-mix(in srgb, var(--tk-face) 90%, var(--ink));
+}
+
+/* 按下：整体沉 2px、底边 3px→1px（观感=底边变矮，键位底部不动） */
+.tool:not(:disabled):active {
+  transform: translateY(2px);
+}
+
+.tool:not(:disabled):active::before {
+  transform: translateY(1px);
+}
+
+/* 锁定态（提示·解法未解锁）：灰键面 + 锁形。禁用不是惩罚，是「还没轮到它」 */
 .tool:disabled {
-  opacity: 0.55;
+  --tk-face: #f1eee4;
+  --tk-edge: #ded8c9;
+  --tk-ink: #a49e91;
   cursor: not-allowed;
 }
 
-.tool .k {
+.tool.hint1 {
+  --tk-face: #a5f3fc;
+  --tk-edge: #0891b2;
+  --tk-ink: var(--brand-ink);
+}
+
+.tool.hint2:not(:disabled) {
+  --tk-face: var(--warn-fill);
+  --tk-edge: var(--warn);
+  --tk-ink: var(--warn-ink);
+}
+
+/* 字形槽：定宽，? / ✓ / 锁 三态共用同一格——状态切换不改变键宽、不推动邻键 */
+.tool .slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  flex: none;
+}
+
+/* 字形与键面文字同墨量：槽里三态（? 文本 / ✓ 与锁自绘 SVG）重量一致 */
+.tool .glyph {
+  font-size: var(--fs-sm);
+  line-height: 1;
+}
+
+/* 扣星价签：琥珀键面上的纸色小牌，−2 与星形双通道（色盲可辨） */
+.tool .cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  padding: 1px 6px 2px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--warn);
+  color: var(--warn-ink);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  color: var(--ink-2);
-  border: 1px solid var(--edge);
-  border-radius: 4px;
-  padding: 0 4px;
-  margin-left: 4px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.tool .warn {
-  color: var(--warn-ink);
+.tool:disabled .cost {
+  border-color: #ded8c9;
+  color: #a49e91;
+}
+
+/* 紧凑档：热身条里的「跳过热身」 */
+.tool.compact .face {
+  min-height: 24px;
+  padding: 0 var(--sp-2);
   font-size: var(--fs-xs);
-}
-
-.hint2:not(:disabled) {
-  border-color: var(--warn);
 }
 
 .warmup-chip {
@@ -285,15 +411,21 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--ch1) 70%, var(--surface));
   border: 1px solid var(--brand);
   border-radius: var(--r-keycap);
-  padding: var(--sp-1) var(--sp-3);
+  padding: 3px 3px 3px var(--sp-3);
 }
 
+/* 计时读数：HUD 数字牌（等宽、纸底），最后 10 秒转琥珀而非报错红——
+   热身永远不是门禁，提示音量为「提醒」不是「惩罚」 */
 .timer {
-  font-weight: 600;
+  font-weight: 700;
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 0 6px 1px;
 }
 
 .timer.low {
-  color: var(--err-ink);
+  color: var(--warn-ink);
+  background: var(--warn-fill);
 }
 
 .head .title {
