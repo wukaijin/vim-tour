@@ -58,8 +58,10 @@ const rows = computed(() =>
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--paper) 60%, transparent);
+  /* 遮罩必须压得住背景：对局屏的 diff 红绿与光标会与模态抢焦点 */
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
   padding: var(--sp-6);
+  animation: veil-in var(--dur-base) var(--ease-out);
 }
 
 .card {
@@ -70,6 +72,27 @@ const rows = computed(() =>
   max-width: 560px;
   width: 100%;
   padding: var(--sp-6);
+  animation: card-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes veil-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .card {
+    animation: none;
+  }
 }
 
 .card-head {

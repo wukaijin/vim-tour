@@ -39,6 +39,8 @@ export interface Toast {
   id: number
   text: string
   tone: 'plain' | 'ok' | 'err'
+  /** 文案后要渲染成键帽的按键（「还没教到：」+ w） */
+  keycap?: string
 }
 
 const WARMUP_BUDGET_MS = 90_000
@@ -92,9 +94,9 @@ export const useGameStore = defineStore('game', () => {
     return a.session.streak
   })
 
-  function showToast(text: string, tone: Toast['tone'] = 'plain'): void {
+  function showToast(text: string, tone: Toast['tone'] = 'plain', keycap?: string): void {
     toastSeq += 1
-    toast.value = { id: toastSeq, text, tone }
+    toast.value = { id: toastSeq, text, tone, keycap }
     if (toastTimer) clearTimeout(toastTimer)
     toastTimer = setTimeout(() => (toast.value = null), 1600)
   }
@@ -155,7 +157,7 @@ export const useGameStore = defineStore('game', () => {
       pushRecent(key)
       rev.value++
       if (out.kind === 'untaught') {
-        showToast(`还没教到：${key === ' ' ? 'Space' : key}`, 'err')
+        showToast('还没教到：', 'err', key === ' ' ? 'Space' : key)
         return
       }
       if (out.kind === 'rep-success') {
@@ -172,7 +174,7 @@ export const useGameStore = defineStore('game', () => {
       pushRecent(key)
       rev.value++
       if (out.kind === 'untaught') {
-        showToast(`还没教到：${key === ' ' ? 'Space' : key}`, 'err')
+        showToast('还没教到：', 'err', key === ' ' ? 'Space' : key)
         return
       }
       if (out.kind === 'rep-success') {

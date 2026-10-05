@@ -202,9 +202,10 @@ const modeLabel: Record<Mode, string> = {
   background-image: none;
 }
 
-/* visual 选区高亮（真实 vim 为反白；键帽母题下用 brand 浅底） */
+/* visual 选区高亮：真实 vim 为反白；键帽母题下用 brand 浅底，
+   但要压得住纸面白——24% 混色在 #FFFDF8 上几乎读不出边界 */
 .seg.sel {
-  background: color-mix(in srgb, var(--brand) 24%, var(--surface));
+  background: color-mix(in srgb, var(--brand) 45%, var(--surface));
   border-radius: 3px;
 }
 
@@ -218,6 +219,8 @@ const modeLabel: Record<Mode, string> = {
   width: 1ch;
   height: 1.45em;
   background: var(--brand-ink);
+  /* 1px 纸色内环：选区加深后光标仍要能与选区切开（光标始终是全屏最亮元素） */
+  box-shadow: inset 0 0 0 1px var(--surface);
   position: relative;
   animation: cursor-blink 1.06s steps(1) infinite;
 }

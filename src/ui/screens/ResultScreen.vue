@@ -47,8 +47,22 @@ const efficiency = computed(() => {
           <span class="vs">击键 / par</span>
           <span class="big par">{{ r.par }}</span>
         </div>
-        <div class="eff-bar" role="img" :aria-label="`效率 ${efficiency}%`">
-          <div class="eff-fill" :style="{ width: `${efficiency}%` }"></div>
+        <div class="eff-meter">
+          <div class="eff-bar" role="img" :aria-label="`用键 ${r.keys}，par ${r.par}，效率 ${efficiency}%`">
+            <div class="eff-fill" :style="{ width: `${efficiency}%` }"></div>
+            <span
+              v-if="efficiency < 100"
+              class="eff-tick"
+              :style="{ left: `${efficiency}%` }"
+              aria-hidden="true"
+            ></span>
+          </div>
+          <!-- 刻度尺：par 分界处标出，左段是 par 额度、右段是多敲的键 -->
+          <div class="eff-scale" aria-hidden="true">
+            <span v-if="efficiency < 100" class="eff-par" :style="{ left: `${efficiency}%` }">
+              par {{ r.par }}
+            </span>
+          </div>
         </div>
         <p class="eff-note" v-if="r.stars === 3">≤ par 且未用提示与撤销——满星路线</p>
         <p class="eff-note" v-else-if="r.stars === 2">再省 {{ Math.max(0, r.keys - r.par) }} 键可冲 3★</p>
@@ -91,6 +105,8 @@ const efficiency = computed(() => {
   width: 100%;
   max-width: 520px;
   background: var(--surface);
+  /* 描边让票卡边界成立，也让齿孔打断的虚线读得出来 */
+  border: 1px solid var(--edge);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-2);
   padding: var(--sp-8);
@@ -99,23 +115,30 @@ const efficiency = computed(() => {
   gap: var(--sp-6);
 }
 
-/* 齿孔：纸面色的圆点打穿卡片上下缘（repeating radial-gradient，零资源） */
+/* 齿孔：纸面色的圆点打穿卡片上下缘（repeating radial-gradient，零资源）。
+   底缘靠 6px 硬阴影带衬托即可读；顶缘外侧是页底色、与卡面仅差 3% 明度，
+   孔洞本身看不见，故顶缘另加一圈 --edge 孔沿 + 外侧页底色遮罩 */
 .perf {
   position: absolute;
   left: 0;
   right: 0;
   height: 14px;
-  background-image: radial-gradient(circle at 8px 7px, var(--paper) 4.5px, transparent 5px);
+  --perf-punch: radial-gradient(circle at 8px 7px, var(--paper) 6px, transparent 6.4px);
+  background-image: var(--perf-punch);
   background-size: 24px 14px;
   background-repeat: repeat-x;
 }
 
 .perf.top {
-  top: -7px;
+  top: -8px;
+  background-image:
+    linear-gradient(to bottom, var(--paper) 0 7px, transparent 7px),
+    radial-gradient(circle at 8px 7px, transparent 4.8px, var(--edge) 4.8px 6px, transparent 6.2px),
+    var(--perf-punch);
 }
 
 .perf.bottom {
-  bottom: -7px;
+  bottom: -8px;
 }
 
 .t-head {
@@ -176,11 +199,19 @@ const efficiency = computed(() => {
   color: var(--ink-2);
 }
 
+.eff-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .eff-bar {
+  position: relative;
   height: 12px;
   border-radius: 6px;
   background: var(--paper);
-  border: 1px solid var(--edge);
+  /* 内环代替描边：填充宽度与刻度共用同一参考宽度，分界不会差 1px */
+  box-shadow: inset 0 0 0 1px var(--edge);
   overflow: hidden;
 }
 
@@ -190,6 +221,30 @@ const efficiency = computed(() => {
   border-radius: inherit;
   animation: fill-sweep var(--dur-slow) var(--ease-out);
   transform-origin: left;
+}
+
+/* par 分界刻度：与填充末端严格同位置 */
+.eff-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+}
+
+.eff-scale {
+  position: relative;
+  height: 14px;
+}
+
+.eff-par {
+  position: absolute;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  white-space: nowrap;
 }
 
 @keyframes fill-sweep {

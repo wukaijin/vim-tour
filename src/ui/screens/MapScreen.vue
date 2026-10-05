@@ -25,10 +25,23 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
 })
 
+/** 节点角标：三种状态三种颜色与字形，不再共用一块纯黑（键帽母题的小键帽形态） */
+type BadgeKind = 'done' | 'due' | 'exam'
+
+function badgeOf(node: NodeInfo): { kind: BadgeKind; label: string } | null {
+  if (node.state === 'done') return { kind: 'done', label: '✓' }
+  if (node.state === 'due-review') return { kind: 'due', label: '复' }
+  if (node.level.graduation) return { kind: 'exam', label: '考' }
+  return null
+}
+
 const chapters = computed(() =>
   CHAPTERS.map((meta) => ({
     meta,
-    nodes: chapterNodes(meta.id, game.levels, (id) => progress.recordOf(id), now.value),
+    nodes: chapterNodes(meta.id, game.levels, (id) => progress.recordOf(id), now.value).map((n) => ({
+      ...n,
+      badge: badgeOf(n),
+    })),
   })),
 )
 
@@ -140,14 +153,7 @@ const warmupCount = computed(() => game.warmupDueIds.length)
             @click="openNode(node)"
           >
             <span class="n-no mono">{{ i + 1 }}</span>
-            <span
-              v-if="node.state === 'done' || node.state === 'due-review' || node.level.graduation"
-              class="n-badge"
-            >
-              <template v-if="node.state === 'done'">✓</template>
-              <template v-else-if="node.state === 'due-review'">复</template>
-              <template v-else-if="node.level.graduation">考</template>
-            </span>
+            <span v-if="node.badge" class="n-badge" :class="node.badge.kind">{{ node.badge.label }}</span>
             <span class="n-stars" v-if="starsOf(node) > 0">
               <span v-for="s in 3" :key="s" class="n-star" :class="{ lit: s <= starsOf(node) }">★</span>
             </span>
@@ -433,21 +439,57 @@ const warmupCount = computed(() => game.warmupDueIds.length)
   }
 }
 
+/* 角标 = 一枚小键帽（顶部高光 + 2px 硬底边），不再是压在节点上的纯黑块。
+   三态三色：✓ 通关取「正确」绿、复 生疏取热身条同族的深青、考 取墨色描边章 */
 .n-badge {
   position: absolute;
-  top: -7px;
-  right: -7px;
-  width: 22px;
-  height: 22px;
+  top: -8px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
   border-radius: var(--r-keycap);
-  background: var(--ink);
-  color: var(--surface);
-  font-size: var(--fs-xs);
-  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--bd-face);
+  color: var(--bd-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 0 var(--bd-edge);
+}
+
+.n-badge.done {
+  --bd-face: var(--ok-ink);
+  --bd-ink: #fff;
+  --bd-edge: #0b5c2e;
+}
+
+.n-badge.due {
+  --bd-face: var(--brand-ink);
+  --bd-ink: #fff;
+  --bd-edge: #0a5568;
+}
+
+.n-badge.exam {
+  --bd-face: var(--surface);
+  --bd-ink: var(--ink);
+  --bd-edge: var(--edge);
+  box-shadow: inset 0 0 0 1px var(--ink), 0 2px 0 var(--edge);
+}
+
+/* 深色章节（ch5–7）反相：浅底深字，否则角标与深青节点糊成一块 */
+.node:not(.ink-border) .n-badge.done {
+  --bd-face: var(--ok-fill);
+  --bd-ink: var(--ok-ink);
+  --bd-edge: var(--ok-ink);
+}
+
+.node:not(.ink-border) .n-badge.due {
+  --bd-face: var(--ch1);
+  --bd-ink: var(--brand-ink);
+  --bd-edge: var(--brand-ink);
 }
 
 .n-stars {
@@ -461,6 +503,15 @@ const warmupCount = computed(() => game.warmupDueIds.length)
 
 .n-star.lit {
   color: var(--warn-ink);
+}
+
+/* 深底章节：未点亮星与点亮星都要换浅档，暗琥珀在 #0E7490 上明度趋同 */
+.node:not(.ink-border) .n-stars {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.node:not(.ink-border) .n-star.lit {
+  color: #fde68a;
 }
 
 .n-label {

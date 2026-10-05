@@ -42,6 +42,7 @@ const recentTrail = computed(() => props.recent.slice(-5))
       </span>
     </div>
     <div class="echo-msg" :class="{ err: !!message }" role="status">{{ message ?? '' }}</div>
+    <span class="echo-slot"><slot name="counters" /></span>
   </div>
 </template>
 
@@ -62,6 +63,7 @@ const recentTrail = computed(() => props.recent.slice(-5))
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  flex: 1;
   min-width: 0;
   overflow: hidden;
 }
@@ -97,7 +99,7 @@ const recentTrail = computed(() => props.recent.slice(-5))
 .echo-msg {
   font-size: var(--fs-xs);
   color: var(--ink-2);
-  min-width: 12ch;
+  min-width: 0;
   text-align: right;
   white-space: nowrap;
   overflow: hidden;
@@ -106,5 +108,14 @@ const recentTrail = computed(() => props.recent.slice(-5))
 
 .echo-msg.err {
   color: var(--err-ink);
+}
+
+/* 计数槽：贴在键帽排右端，与条外框共用一条右边界 */
+.echo-slot {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--edge);
 }
 </style>

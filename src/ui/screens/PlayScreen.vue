@@ -7,6 +7,7 @@ import { useGameStore } from '../stores/game'
 import EditorView from '../components/EditorView.vue'
 import TargetDiff from '../components/TargetDiff.vue'
 import KeyEchoBar from '../components/KeyEchoBar.vue'
+import Keycap from '../components/Keycap.vue'
 import StreakLamps from '../components/StreakLamps.vue'
 import TeachingCard from '../components/TeachingCard.vue'
 
@@ -150,27 +151,37 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <div class="echo-row">
+    <!-- 底部停靠区：提示条 + 回显条吸底（vim 命令行的空间位置），toast 浮在其上方 -->
+    <div class="dock">
+      <div v-if="game.hintText" class="hint-panel" :data-stage="game.hintStage" role="note">
+        <span class="hint-tag">{{ game.hintStage === 1 ? '方向提示' : '完整解法' }}</span>
+        <span>{{ game.hintText }}</span>
+        <span v-if="game.hintStage" class="hint-cost">看过提示，本次封顶 1 ★</span>
+      </div>
+
       <KeyEchoBar
         :pending="pending"
         :mode="mode"
         :cmdline="cmdline"
         :recent="game.recentKeys"
         :message="message"
-      />
-      <span class="counters mono" aria-label="击键与 par">
-        <b>{{ view?.keys ?? 0 }}</b> 击键 · par <b>{{ view?.par ?? 0 }}</b>
-      </span>
-    </div>
+      >
+        <template #counters>
+          <span class="counters mono" aria-label="击键与 par">
+            <b>{{ view?.keys ?? 0 }}</b> 击键 · par <b>{{ view?.par ?? 0 }}</b>
+          </span>
+        </template>
+      </KeyEchoBar>
 
-    <div v-if="game.hintText" class="hint-panel" :data-stage="game.hintStage" role="note">
-      <span class="hint-tag">{{ game.hintStage === 1 ? '方向提示' : '完整解法' }}</span>
-      <span>{{ game.hintText }}</span>
-      <span v-if="game.hintStage" class="hint-cost">看过提示，本次封顶 1 ★</span>
-    </div>
-
-    <div v-if="game.toast" class="toast" :class="game.toast.tone" :key="game.toast.id" role="status">
-      {{ game.toast.text }}
+      <div v-if="game.toast" class="toast" :class="game.toast.tone" :key="game.toast.id" role="status">
+        <span>{{ game.toast.text }}</span>
+        <Keycap
+          v-if="game.toast.keycap"
+          :label="game.toast.keycap"
+          size="sm"
+          :tone="game.toast.tone === 'err' ? 'err' : 'plain'"
+        />
+      </div>
     </div>
 
     <TeachingCard
@@ -279,17 +290,20 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: var(--sp-4);
-  align-items: start;
+  align-items: stretch;
+  /* 缓冲区撑满可用高度：vim 里编辑区占满窗口，命令行只占最后一行；
+     否则短关卡会变成「内容顶在上、状态条贴在下、中间一片空洞」 */
+  flex: 1 0 auto;
+  min-height: 240px;
 }
 
-.echo-row {
+/* 停靠区吸底：对局屏不再是内容压在顶部、下半屏空置的头重脚轻构图 */
+.dock {
+  position: relative;
+  margin-top: auto;
   display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-}
-
-.echo-row > :first-child {
-  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-3);
 }
 
 .counters {
@@ -315,10 +329,11 @@ onBeforeUnmount(() => {
   color: var(--warn-ink);
 }
 
+/* 完整解法不是错误：与方向提示同属 warn 家族（PLAN §8.2「提示扣星」），
+   换纸色底 + 正文墨色承载更长的解法文本，代价交给琥珀色的 cost 标注 */
 .hint-panel[data-stage='2'] {
-  background: var(--err-fill);
-  border-color: var(--err);
-  color: var(--err-ink);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .hint-tag {
@@ -329,28 +344,38 @@ onBeforeUnmount(() => {
 .hint-cost {
   margin-left: auto;
   font-size: var(--fs-xs);
+  color: var(--warn-ink);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
+/* toast：贴在停靠区上方，描边语义色取代饱和实底（不再孤悬在视口 87% 高处） */
 .toast {
-  position: fixed;
+  position: absolute;
   left: 50%;
-  bottom: 96px;
+  bottom: calc(100% + var(--sp-3));
   transform: translateX(-50%);
-  background: var(--ink);
-  color: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--surface);
+  color: var(--ink);
+  border: 2px solid var(--toast-accent, var(--ink-2));
   border-radius: var(--r-input);
-  padding: var(--sp-2) var(--sp-6);
+  box-shadow: var(--shadow-1);
+  padding: var(--sp-1) var(--sp-4);
   font-size: var(--fs-sm);
+  white-space: nowrap;
   animation: toast-in var(--dur-base) var(--ease-out);
-  z-index: 40;
+  z-index: 5;
 }
 
 .toast.ok {
-  background: var(--ok-ink);
+  --toast-accent: var(--ok-ink);
 }
 
 .toast.err {
-  background: var(--err-ink);
+  --toast-accent: var(--err-ink);
 }
 
 @keyframes toast-in {
