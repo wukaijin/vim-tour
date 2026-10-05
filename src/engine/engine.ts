@@ -93,6 +93,80 @@ export class VimEngine {
     return { lines: [...this.lines], cursor: { ...this.cursor } }
   }
 
+  /**
+   * 行为态指纹（求解器去重用，PLAN §14.3）：覆盖一切影响后续 press 结果的字段。
+   * 漏字段 = 把两个不同状态当同一个 = 丢解或次优解；因此这里宁可多带。
+   * undo/redo 栈不在此列：撤销键不在求解器字母表内（3 星本就禁用撤销）。
+   */
+  stateKey(): string {
+    const p: (string | number | boolean | null)[] = [
+      this.lines.join('\u0001'),
+      this.cursor.line,
+      this.cursor.col,
+      this.mode,
+      this.count,
+      this.registerName,
+      this.operator,
+      this.opCount,
+      this.visualAnchor ? `${this.visualAnchor.line},${this.visualAnchor.col}` : null,
+      this.cmdline ? `${this.cmdline.kind}\u0001${this.cmdline.text}` : null,
+      this.desiredCol,
+      this.awaitingRegister ? 1 : 0,
+      this.awaitingFind,
+      this.awaitingObject,
+      this.awaitingG ? 1 : 0,
+      this.lastFind ? `${this.lastFind.dir}\u0001${this.lastFind.till ? 1 : 0}\u0001${this.lastFind.ch}` : null,
+      this.lastChangeKeys ? this.lastChangeKeys.join('') : null,
+      this.lastPattern ? `${this.lastPattern.re.source}\u0001${this.lastPattern.re.flags}\u0001${this.lastPattern.dir}` : null,
+      this.blockCtx ? `${this.blockCtx.firstLine},${this.blockCtx.lastLine},${this.blockCtx.col},${this.blockCtx.mode},${this.blockCtx.origLen}` : null,
+      this.trace.slice(this.traceStart()).join(''),
+      this.cmdStart - this.traceStart(),
+      this.changeStart == null ? null : this.changeStart - this.traceStart(),
+      this.changeDirty ? 1 : 0,
+      this.registers.stateKey(),
+    ]
+    return JSON.stringify(p)
+  }
+
+  /** trace 中仍会影响未来行为的最早位置：`. ` 记录只用到从这里起的键 */
+  private traceStart(): number {
+    return this.changeStart ?? this.cmdStart
+  }
+
+  /**
+   * 复制一个行为态等价的引擎（求解器搜索用）。
+   * undo/redo 历史不复制：求解器字母表排除了撤销键，历史不影响任何后续转移。
+   */
+  clone(): VimEngine {
+    const e = new VimEngine({ lines: this.lines, cursor: this.cursor })
+    e.mode = this.mode
+    e.count = this.count
+    e.registerName = this.registerName
+    e.operator = this.operator
+    e.visualAnchor = this.visualAnchor ? { ...this.visualAnchor } : null
+    e.cmdline = this.cmdline ? { ...this.cmdline } : null
+    e.desiredCol = this.desiredCol
+    e.opCount = this.opCount
+    e.awaitingRegister = this.awaitingRegister
+    e.awaitingFind = this.awaitingFind
+    e.awaitingObject = this.awaitingObject
+    e.awaitingG = this.awaitingG
+    e.lastFind = this.lastFind ? { ...this.lastFind } : null
+    e.lastChangeKeys = this.lastChangeKeys ? [...this.lastChangeKeys] : null
+    e.registers = this.registers.clone()
+    e.lastPattern = this.lastPattern ? { re: this.lastPattern.re, dir: this.lastPattern.dir } : null
+    e.blockCtx = this.blockCtx ? { ...this.blockCtx } : null
+    // trace 只保留「未来仍会被 slice 到」的尾部：否则每次 clone 都拖一条无限增长的按键史，
+    // 去重指纹也会被历史污染（同样缓冲区 + 不同路径 = 不同指纹 = 去重失效）
+    const s = this.traceStart()
+    e.trace = this.trace.slice(s)
+    e.cmdStart = this.cmdStart - s
+    e.changeStart = this.changeStart == null ? null : this.changeStart - s
+    e.changeDirty = this.changeDirty
+    e.replaying = this.replaying
+    return e
+  }
+
   /** 按键回显栏内容：寄存器前缀 + count + operator + 等待态 / cmdline 文本 */
   pendingEcho(): string {
     if (this.mode === 'cmdline' && this.cmdline) {
@@ -961,8 +1035,11 @@ export class VimEngine {
         const prev = this.lines[this.cursor.line - 1]
         const next = [...this.lines]
         next.splice(this.cursor.line - 1, 2, prev + line)
+        // 接缝坐标要在 setLines 之前算：setLines 内会 clamp 光标，之后取 this.cursor.line - 1 会得到 -1
+        const joinedLine = this.cursor.line - 1
+        const joinedCol = prev.length
         this.setLines(next)
-        this.cursor = { line: this.cursor.line - 1, col: prev.length }
+        this.cursor = { line: joinedLine, col: joinedCol }
       }
       return ok(true)
     }

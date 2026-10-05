@@ -6,18 +6,25 @@ import type { useGameStore } from './stores/game'
  *   #/          章节地图
  *   #/level/x   对局屏（关卡 x）
  *   #/warmup    对局屏（热身）
+ *   #/forge     关卡工坊（沙盒：生成台/关卡库/模型设置）
+ *   #/forge/play/x  对局屏（沙盒关卡 x；独立命名空间，不经过 unlock 守卫）
  * 结算屏不可寻址：hash 停留在进入对局前的值——后退回地图、刷新重进该关，都自然。
  */
 export type Route =
   | { name: 'map' }
   | { name: 'level'; id: string }
   | { name: 'warmup' }
+  | { name: 'forge' }
+  | { name: 'sandbox'; id: string }
   | { name: 'unknown' }
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#/, '')
   if (h === '' || h === '/') return { name: 'map' }
   if (h === '/warmup') return { name: 'warmup' }
+  if (h === '/forge') return { name: 'forge' }
+  const sbx = h.match(/^\/forge\/play\/([\w-]+)$/)
+  if (sbx) return { name: 'sandbox', id: sbx[1]! }
   const m = h.match(/^\/level\/([\w-]+)$/)
   return m ? { name: 'level', id: m[1]! } : { name: 'unknown' }
 }
@@ -27,9 +34,11 @@ type GameStore = ReturnType<typeof useGameStore>
 /** store 当前状态期望的 hash；null = 状态不可寻址（结算屏），不动 URL */
 function desiredHash(game: GameStore): string | null {
   if (game.screen === 'map') return '#/'
+  if (game.screen === 'forge') return '#/forge'
   if (game.screen === 'result') return null
   const a = game.active
   if (a?.kind === 'warmup') return '#/warmup'
+  if (a?.kind === 'sandbox') return `#/forge/play/${a.level.id}`
   if (a?.kind === 'level') return `#/level/${a.level.id}`
   return null
 }
@@ -69,6 +78,19 @@ export function installRouter(game: GameStore): void {
           if (!game.warmup) location.hash = '#/'
         }
         break
+      case 'forge':
+        if (game.screen !== 'forge') game.gotoForge()
+        break
+      case 'sandbox': {
+        const a = game.active
+        const onIt = a?.kind === 'sandbox' && a.level.id === route.id && game.screen === 'play'
+        if (!onIt && !game.openSandboxLevel(route.id)) {
+          // 直链的沙盒关卡不存在或已被删除：拉回工坊
+          game.showToast('沙盒关卡不存在或已被删除', 'err')
+          location.hash = '#/forge'
+        }
+        break
+      }
       default:
         location.hash = '#/'
     }

@@ -12,14 +12,18 @@ import { nextLevelId, levelLocked } from '../../game/nodes'
 import { dismissWarmupToday, isWarmupDismissed, selectWarmup } from '../../game/warmup'
 import type { Level, LevelRecord, Stars } from '../../game/types'
 import { detectStorage } from '../../storage/progress'
+import { defaultSandboxRepository } from '../../storage/sandbox'
+import { applySandboxConcede, applySandboxResult, sandboxLevelView } from '../../forge/level'
+import type { SandboxLevel, SandboxStats } from '../../forge/types'
 import { markCardSeen, seenCard } from '../../storage/flags'
 import { useProgressStore } from './progress'
 
-export type Screen = 'map' | 'play' | 'result'
+export type Screen = 'map' | 'play' | 'result' | 'forge'
 
 type Active =
   | { kind: 'level'; level: Level; session: LevelSession }
   | { kind: 'warmup'; level: Level; run: LevelRun; record: LevelRecord }
+  | { kind: 'sandbox'; level: Level; sandbox: SandboxLevel; run: LevelRun }
 
 export interface ResultPayload {
   levelId: string
@@ -33,6 +37,8 @@ export interface ResultPayload {
   nextLevelId: string | null
   /** par 连招组块（PLAN §2.4D：仅 3 星结算屏渲染） */
   combo: ComboChunk[]
+  /** 沙盒关（PLAN §14.5）：结算屏带标识、成绩只写沙盒库 */
+  sandbox?: boolean
 }
 
 export interface Toast {
@@ -48,6 +54,7 @@ const WARMUP_BUDGET_MS = 90_000
 export const useGameStore = defineStore('game', () => {
   const progress = useProgressStore()
   const storage = detectStorage()
+  const sandbox = defaultSandboxRepository()
 
   const screen = ref<Screen>('map')
   const levelsReady = ref(false)
@@ -87,6 +94,8 @@ export const useGameStore = defineStore('game', () => {
     return a.kind === 'level' ? a.session.requiredStreak : 1
   })
 
+  const isSandbox = computed(() => active.value?.kind === 'sandbox')
+
   const streak = computed(() => {
     void rev.value
     const a = active.value
@@ -124,6 +133,25 @@ export const useGameStore = defineStore('game', () => {
     })
     active.value = { kind: 'level', level, session }
     cardVisible.value = !!level.teaches && level.teaches.length > 0 && !seenCard(storage, levelId)
+    hintStage.value = 0
+    hintText.value = null
+    recentKeys.value = []
+    result.value = null
+    screen.value = 'play'
+    return true
+  }
+
+  /** 进入沙盒关对局（PLAN §14.5）：成绩只写沙盒库，不碰进度仓库与热身池 */
+  function openSandboxLevel(id: string): boolean {
+    const sbx = sandbox.get(id)
+    if (!sbx) return false
+    active.value = {
+      kind: 'sandbox',
+      level: sandboxLevelView(sbx),
+      sandbox: sbx,
+      run: new LevelRun(sbx.text, sbx.allowedKeys),
+    }
+    cardVisible.value = false
     hintStage.value = 0
     hintText.value = null
     recentKeys.value = []
@@ -179,7 +207,7 @@ export const useGameStore = defineStore('game', () => {
           showToast(`✓ 本轮完成（${out.streak}/${a.session.requiredStreak}）`, 'ok')
         }
       }
-    } else {
+    } else if (a.kind === 'warmup') {
       const out = a.run.feed(key)
       pushRecent(key)
       rev.value++
@@ -199,6 +227,20 @@ export const useGameStore = defineStore('game', () => {
         showToast('✓ 热身完成一题', 'ok')
         advanceWarmup()
       }
+    } else {
+      const out = a.run.feed(key)
+      pushRecent(key)
+      rev.value++
+      if (out.kind === 'untaught') {
+        showToast('还没教到：', 'err', key === ' ' ? 'Space' : key)
+        return
+      }
+      if (out.kind === 'rep-success') {
+        const stats = applySandboxResult(a.sandbox.stats, { stars: out.stars, keys: out.keys })
+        sandbox.put({ ...a.sandbox, stats })
+        showFlash('rep-ok')
+        finishSandbox(a.level, out.stars, out.keys, a.run.par, a.run.combo, stats)
+      }
     }
   }
 
@@ -214,12 +256,23 @@ export const useGameStore = defineStore('game', () => {
         showFlash('rep-err')
         showToast('本轮重来：连续成功已清零', 'err')
       }
-    } else if (a.run.concede()) {
-      // 热身题放弃：计一次失败后进入下一题（保持 ≤90 秒节奏）
-      const rec = applyProgressEvent(a.record, a.level.id, { kind: 'rep-failure' }, Date.now())
-      progress.put(rec)
-      showToast('这题跳过', 'err')
-      advanceWarmup()
+    } else if (a.kind === 'warmup') {
+      if (a.run.concede()) {
+        // 热身题放弃：计一次失败后进入下一题（保持 ≤90 秒节奏）
+        const rec = applyProgressEvent(a.record, a.level.id, { kind: 'rep-failure' }, Date.now())
+        progress.put(rec)
+        showToast('这题跳过', 'err')
+        advanceWarmup()
+      }
+    } else {
+      // 沙盒重来：只累计 attempts（有操作才算），无连续计数语义
+      if (a.run.concede()) {
+        sandbox.put({ ...a.sandbox, stats: applySandboxConcede(a.sandbox.stats) })
+      }
+      const fresh = sandbox.get(a.sandbox.id)
+      if (fresh) active.value = { kind: 'sandbox', level: a.level, sandbox: fresh, run: new LevelRun(fresh.text, fresh.allowedKeys) }
+      rev.value++
+      recentKeys.value = []
     }
   }
 
@@ -244,6 +297,31 @@ export const useGameStore = defineStore('game', () => {
       bestStars: (rec ? rec.bestStars : 0) as Stars,
       graduation: !!level.graduation,
       nextLevelId: nextLevelId(levels.value, (id) => progress.recordOf(id), Date.now()),
+    }
+    screen.value = 'result'
+  }
+
+  /** 沙盒结算（PLAN §14.5）：单关机制全保留，无跨关经营 */
+  function finishSandbox(
+    level: Level,
+    stars: Stars,
+    keys: number,
+    par: number,
+    combo: ComboChunk[],
+    stats: SandboxStats,
+  ): void {
+    result.value = {
+      levelId: level.id,
+      title: level.title,
+      stars,
+      keys,
+      par,
+      combo,
+      requiredStreak: 1,
+      bestStars: stats.bestStars,
+      graduation: false,
+      nextLevelId: null,
+      sandbox: true,
     }
     screen.value = 'result'
   }
@@ -349,6 +427,19 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  /** 进入关卡工坊（PLAN §14.5；热身进行中先收尾，防两套流程叠加） */
+  function gotoForge(): void {
+    if (warmup.value) finishWarmup()
+    active.value = null
+    screen.value = 'forge'
+  }
+
+  /** 对局屏「返回」：沙盒回工坊，正篇回地图 */
+  function returnFromPlay(): void {
+    if (active.value?.kind === 'sandbox') gotoForge()
+    else gotoMap()
+  }
+
   return {
     screen,
     levelsReady,
@@ -356,6 +447,7 @@ export const useGameStore = defineStore('game', () => {
     activeLevel,
     activeRun,
     requiredStreak,
+    isSandbox,
     streak,
     rev,
     cardVisible,
@@ -371,6 +463,7 @@ export const useGameStore = defineStore('game', () => {
     levels,
     boot,
     openLevel,
+    openSandboxLevel,
     closeCard,
     reopenCard,
     showToast,
@@ -381,5 +474,7 @@ export const useGameStore = defineStore('game', () => {
     finishWarmup,
     dismissWarmup,
     gotoMap,
+    gotoForge,
+    returnFromPlay,
   }
 })

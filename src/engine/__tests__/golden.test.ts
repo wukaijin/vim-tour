@@ -14,6 +14,18 @@ describe('ch1 生存：i a o O x dd yy p u', () => {
     expect(run(TEXT, 'a!').lines[0]).toBe('f!oo bar baz')
   })
 
+  it('插入模式 <BS>：行首退格与上一行合并，光标落在接缝处', () => {
+    // 回归：合并行时 setLines 已把光标 clamp 到第 0 行，旧实现再减一得到 cursor.line = -1
+    const r = run(['abc', 'def'], 'ji<BS>')
+    expect(r.lines).toEqual(['abcdef'])
+    expect(r.cursor).toEqual({ line: 0, col: 3 })
+    expect(r.mode).toBe('insert')
+
+    const noop = run(['a', 'b'], 'i<BS>')
+    expect(noop.lines).toEqual(['a', 'b'])
+    expect(noop.cursor).toEqual({ line: 0, col: 0 })
+  })
+
   it('A 行尾追加 / I 行首插入', () => {
     expect(run(TEXT, 'A;').lines[0]).toBe('foo bar baz;')
     expect(run(['  ind', 'x'], 'I-<Esc>').lines[0]).toBe('  -ind')

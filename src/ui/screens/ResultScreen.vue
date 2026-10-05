@@ -32,7 +32,7 @@ const efficiency = computed(() => {
       <div class="perf top" aria-hidden="true"></div>
 
       <header class="t-head">
-        <span class="t-chip mono">{{ r.graduation ? '毕业考通过' : '关卡通过' }}</span>
+        <span class="t-chip mono">{{ r.sandbox ? '沙盒关卡' : r.graduation ? '毕业考通过' : '关卡通过' }}</span>
         <h1 class="t-title">{{ r.title }}</h1>
       </header>
 
@@ -74,18 +74,23 @@ const efficiency = computed(() => {
         <ComboStrip :chunks="r.combo" />
       </div>
 
-      <div class="t-streak">
+      <div class="t-streak" v-if="!r.sandbox">
         <StreakLamps :k="r.requiredStreak" :n="r.requiredStreak" />
       </div>
 
       <p v-if="r.graduation" class="t-grad">本章所有关卡的复习时钟已刷新</p>
+      <p v-else-if="r.sandbox" class="t-grad">沙盒成绩只记在这道题上，不影响正篇进度</p>
 
       <div class="perf bottom" aria-hidden="true"></div>
 
       <footer class="t-actions">
-        <button ref="continueBtn" class="btn primary" @click="game.gotoMap()">回到地图</button>
+        <button ref="continueBtn" class="btn primary" @click="r.sandbox ? game.gotoForge() : game.gotoMap()">
+          {{ r.sandbox ? '回到工坊' : '回到地图' }}
+        </button>
         <button v-if="r.nextLevelId" class="btn" @click="game.openLevel(r.nextLevelId)">下一关</button>
-        <button class="btn ghost" @click="game.openLevel(r.levelId)">再打一遍</button>
+        <button class="btn ghost" @click="r.sandbox ? game.openSandboxLevel(r.levelId) : game.openLevel(r.levelId)">
+          再打一遍
+        </button>
       </footer>
     </div>
   </div>

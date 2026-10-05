@@ -174,11 +174,14 @@ onBeforeUnmount(() => {
             <span class="face"><span class="label">跳过热身</span></span>
           </button>
         </div>
+        <div v-else-if="game.isSandbox" class="warmup-chip">
+          <span class="warmup-label">沙盒 · 一局定星</span>
+        </div>
         <StreakLamps v-else :k="game.streak" :n="game.requiredStreak" />
-        <button class="tool back" @click="game.gotoMap(); reclaimFocus()">
+        <button class="tool back" @click="game.returnFromPlay(); reclaimFocus()">
           <span class="face">
             <span class="slot"><span class="glyph" aria-hidden="true">←</span></span>
-            <span class="label">返回地图</span>
+            <span class="label">{{ game.isSandbox ? '返回工坊' : '返回地图' }}</span>
           </span>
         </button>
       </div>

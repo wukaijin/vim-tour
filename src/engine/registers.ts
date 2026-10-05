@@ -23,4 +23,23 @@ export class Registers {
     this.map.set('"', content)
     if (name != null && name !== '"') this.map.set(name, content)
   }
+
+  /** 深拷贝（求解器搜索用，无共享引用） */
+  clone(): Registers {
+    const r = new Registers()
+    for (const [k, v] of this.map) {
+      r.map.set(k, { text: [...v.text], linewise: v.linewise, blockwise: v.blockwise })
+    }
+    return r
+  }
+
+  /** 行为态序列化（键排序保证稳定） */
+  stateKey(): string {
+    const parts: string[] = []
+    for (const k of [...this.map.keys()].sort()) {
+      const v = this.map.get(k)!
+      parts.push(`${k}\u0001${v.linewise ? 1 : 0}${v.blockwise ? 1 : 0}\u0001${v.text.join('\u0001')}`)
+    }
+    return parts.join('\u0002')
+  }
 }

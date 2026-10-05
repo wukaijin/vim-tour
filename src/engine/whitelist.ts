@@ -34,6 +34,19 @@ export class KeyFilter {
     this.buf = []
   }
 
+  /** 复制过滤器状态（求解器搜索用；trie 结构共享，仅复制缓冲） */
+  clone(): KeyFilter {
+    const f = new KeyFilter([])
+    f.root = this.root
+    f.buf = [...this.buf]
+    return f
+  }
+
+  /** 当前挂起缓冲（只读快照）：求解器据此判断 f/F/t/T 是否在等参数字符 */
+  pending(): readonly Key[] {
+    return this.buf
+  }
+
   feed(key: Key): FeedVerdict {
     if (key === '<Esc>') {
       this.reset()

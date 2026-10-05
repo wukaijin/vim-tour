@@ -166,7 +166,10 @@ const warmupCount = computed(() => game.warmupDueIds.length)
 
     <footer class="foot">
       <span class="foot-note">进度存在本机 localStorage，无账号无同步</span>
-      <button class="reset" @click="progress.clearAll()">重置全部进度</button>
+      <span class="foot-links">
+        <button class="reset forge-link" @click="game.gotoForge()">关卡工坊</button>
+        <button class="reset" @click="progress.clearAll()">重置全部进度</button>
+      </span>
     </footer>
   </div>
 </template>
@@ -545,6 +548,16 @@ const warmupCount = computed(() => game.warmupDueIds.length)
   color: var(--ink-2);
   font-size: var(--fs-xs);
   padding: 2px 10px;
+}
+
+.foot-links {
+  display: inline-flex;
+  gap: var(--sp-2);
+}
+
+.forge-link {
+  color: var(--brand-ink);
+  border-color: var(--brand);
 }
 
 @media (prefers-reduced-motion: reduce) {

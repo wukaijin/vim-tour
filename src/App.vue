@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { defineAsyncComponent, onMounted } from 'vue'
 import { useGameStore } from './ui/stores/game'
 import { installRouter } from './ui/router'
 import MapScreen from './ui/screens/MapScreen.vue'
 import PlayScreen from './ui/screens/PlayScreen.vue'
 import ResultScreen from './ui/screens/ResultScreen.vue'
 import ToastItem from './ui/components/ToastItem.vue'
+
+// 工坊（含求解器/生成器/provider）懒加载：不进首屏 chunk（PLAN §14.8）
+const ForgeScreen = defineAsyncComponent(() => import('./ui/screens/ForgeScreen.vue'))
 
 const game = useGameStore()
 
@@ -20,10 +23,15 @@ onMounted(() => {
     <span class="loading-keys" aria-hidden="true"><b>v</b><b>i</b><b>m</b></span>
   </div>
   <MapScreen v-else-if="game.screen === 'map'" />
+  <ForgeScreen v-else-if="game.screen === 'forge'" />
   <PlayScreen v-else-if="game.screen === 'play'" />
   <ResultScreen v-else />
-  <!-- 地图态的全局提示（拒绝直链/热身结束）：对局屏的 toast 由 PlayScreen 自渲染 -->
-  <ToastItem v-if="game.levelsReady && game.screen === 'map' && game.toast" :toast="game.toast" placement="float" />
+  <!-- 地图/工坊态的全局提示（拒绝直链/热身结束/沙盒提示）：对局屏的 toast 由 PlayScreen 自渲染 -->
+  <ToastItem
+    v-if="game.levelsReady && (game.screen === 'map' || game.screen === 'forge') && game.toast"
+    :toast="game.toast"
+    placement="float"
+  />
 </template>
 
 <style scoped>
