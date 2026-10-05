@@ -1410,7 +1410,10 @@ export class VimEngine {
   private execSearch(dir: 1 | -1, pattern: string): PressResult {
     this.resetCmd()
     if (pattern === '') {
-      return this.lastPattern ? this.searchJump(this.lastPattern.dir, this.lastPattern.re) : ok(false)
+      // 空模式复用上次 pattern，但方向由本次 / 或 ? 决定（真实 vim 语义）
+      if (!this.lastPattern) return ok(false)
+      this.lastPattern = { re: this.lastPattern.re, dir }
+      return this.searchJump(dir, this.lastPattern.re)
     }
     const re = compilePattern(pattern)
     if (!re) return ok(false, 'Bad pattern')
@@ -1426,10 +1429,11 @@ export class VimEngine {
     return ok()
   }
 
-  private execSearchNext(dir: 1 | -1): PressResult {
+  private execSearchNext(logical: 1 | -1): PressResult {
     this.resetCmd()
     if (!this.lastPattern) return ok(false, 'No previous search pattern')
-    return this.searchJump(dir, this.lastPattern.re)
+    // 真实 vim：n 沿上次搜索方向重复、N 反向——逻辑方向 × 历史方向
+    return this.searchJump((logical * this.lastPattern.dir) as 1 | -1, this.lastPattern.re)
   }
 
   private execSearchWord(dir: 1 | -1): PressResult {

@@ -216,3 +216,143 @@ describe('. 重复与 undo 边界', () => {
     expect(e.pendingEcho()).toBe('2d3')
   })
 })
+
+describe('ch6 查找替换：/ ? n N # * :s', () => {
+  const FIND = ['aa target bb', 'cc target dd', 'ee target ff']
+
+  it('/pat<CR> 跳到匹配首列；不匹配报 Pattern not found 且光标不动', () => {
+    const r = run(TEXT, '/bar<CR>')
+    expect(r.cursor).toEqual({ line: 0, col: 4 })
+    expect(r.mode).toBe('normal')
+    const e = new VimEngine({ lines: TEXT })
+    e.pressAll('/zzz<CR>')
+    expect(e.cursor).toEqual({ line: 0, col: 0 })
+    expect(e.message).toBe('Pattern not found')
+  })
+
+  it('/ 跨行搜索与环绕回绕（wrap）', () => {
+    expect(run(TEXT, '/quux<CR>').cursor).toEqual({ line: 1, col: 4 })
+    expect(run(TEXT, 'G$/foo<CR>').cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it('?pat<CR> 反向搜索（取行内最后一处匹配）', () => {
+    const r = run(['head alpha mid alpha end', 'plain'], '?alpha<CR>', { line: 0, col: 14 })
+    expect(r.cursor).toEqual({ line: 0, col: 5 })
+    expect(run(FIND, '?target<CR>', { line: 1, col: 0 }).cursor).toEqual({ line: 0, col: 3 })
+  })
+
+  it('n/N 沿历史方向翻转：? 后 n 同向（向后）、N 反向（向前）', () => {
+    // 光标 (1,3)→?target→(0,3)；n 同向向后环绕到 (2,3)；N 反向向前回到 (0,3)
+    const e = new VimEngine({ lines: FIND, cursor: { line: 1, col: 3 } })
+    e.pressAll('?target<CR>')
+    expect(e.cursor).toEqual({ line: 0, col: 3 })
+    e.press('n')
+    expect(e.cursor).toEqual({ line: 2, col: 3 })
+    e.press('N')
+    expect(e.cursor).toEqual({ line: 0, col: 3 })
+  })
+
+  it('/ 后 n 向前、N 向后；n 无历史报错', () => {
+    const e = new VimEngine({ lines: FIND })
+    e.pressAll('/target<CR>')
+    expect(e.cursor).toEqual({ line: 0, col: 3 })
+    e.press('n')
+    expect(e.cursor).toEqual({ line: 1, col: 3 })
+    e.press('N')
+    expect(e.cursor).toEqual({ line: 0, col: 3 })
+    const e2 = new VimEngine({ lines: FIND })
+    e2.press('n')
+    expect(e2.message).toBe('No previous search pattern')
+  })
+
+  it('/<CR> 空模式复用上次 pattern，方向按本次 /', () => {
+    const e = new VimEngine({ lines: FIND, cursor: { line: 1, col: 0 } })
+    e.pressAll('?target<CR>')
+    e.pressAll('/<CR>')
+    expect(e.cursor).toEqual({ line: 1, col: 3 })
+  })
+
+  it('/\<word\> 词边界：整词命中，前缀不命中', () => {
+    expect(run(TEXT, '/\\<bar\\><CR>').cursor).toEqual({ line: 0, col: 4 })
+    const e = new VimEngine({ lines: TEXT })
+    e.pressAll('/\\<ba\\><CR>')
+    expect(e.message).toBe('Pattern not found')
+  })
+
+  it('* 整词向前搜索（词边界，不命中长词）；# 反向', () => {
+    const STAR = ['foo bar', 'foobar baz', 'foo qux']
+    const e = new VimEngine({ lines: STAR })
+    e.press('*')
+    expect(e.cursor).toEqual({ line: 2, col: 0 })
+    e.press('#')
+    expect(e.cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it('* 搜过的词进入历史：n 沿历史方向继续（环绕回首处）；非词字符上 * 报 No word under cursor（简化）', () => {
+    const e = new VimEngine({ lines: ['aa bb aa', 'x'] })
+    e.press('*')
+    expect(e.cursor).toEqual({ line: 0, col: 6 })
+    e.press('n')
+    expect(e.cursor).toEqual({ line: 0, col: 0 })
+    const e2 = new VimEngine({ lines: TEXT, cursor: { line: 0, col: 3 } })
+    e2.press('*')
+    expect(e2.message).toBe('No word under cursor')
+  })
+
+  it('cmdline 编辑：<BS> 退格、删空后再按退出、<Esc> 取消不搜索', () => {
+    const e = new VimEngine({ lines: TEXT })
+    e.pressAll('/barx<BS><BS><CR>')
+    expect(e.cursor).toEqual({ line: 0, col: 4 })
+    e.pressAll('/zz<BS><BS><BS>')
+    expect(e.mode).toBe('normal')
+    const e2 = new VimEngine({ lines: TEXT })
+    e2.pressAll('/qux<Esc>')
+    expect(e2.mode).toBe('normal')
+    expect(e2.cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it(':s/a/b/ 当前行首处替换，光标到行首', () => {
+    const r = run(['alpha beta', 'alpha gamma'], ':s/alpha/X/<CR>')
+    expect(r.lines).toEqual(['X beta', 'alpha gamma'])
+    expect(r.cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it(':s/a/b/g 全行替换；:s/a/b/i 忽略大小写', () => {
+    expect(run(['a a a'], ':s/a/B/g<CR>').lines).toEqual(['B B B'])
+    expect(run(['Cat fish'], ':s/cat/dog/i<CR>').lines).toEqual(['dog fish'])
+  })
+
+  it(':%s 只动命中行，光标到最后替换行行首非空；g 全量', () => {
+    const r = run(['  noise', 'a x a', 'zzz', '  a y'], ':%s/a/Z/<CR>')
+    expect(r.lines).toEqual(['  noise', 'Z x a', 'zzz', '  Z y'])
+    expect(r.cursor).toEqual({ line: 3, col: 2 })
+    const r2 = run(['a a', 'nope', 'a'], ':%s/a/B/g<CR>')
+    expect(r2.lines).toEqual(['B B', 'nope', 'B'])
+    expect(r2.cursor).toEqual({ line: 2, col: 0 })
+  })
+
+  it(':s 引用：& 整个匹配、\\1 分组、\\/ 字面斜杠', () => {
+    expect(run(['cat dog'], ':s/cat/[&]/<CR>').lines).toEqual(['[cat] dog'])
+    expect(run(['cat dog'], ':s/\\(cat\\) \\(dog\\)/\\2 \\1/<CR>').lines).toEqual(['dog cat'])
+    expect(run(['a/b'], ':s/a\\/b/X/<CR>').lines).toEqual(['X'])
+  })
+
+  it('u 一次撤销整批 :%s；无命中报 Pattern not found', () => {
+    const e = new VimEngine({ lines: ['a b', 'a c'] })
+    e.pressAll(':%s/a/Z/<CR>')
+    expect(e.lines).toEqual(['Z b', 'Z c'])
+    e.press('u')
+    expect(e.lines).toEqual(['a b', 'a c'])
+    e.pressAll(':%s/zz/y/<CR>')
+    expect(e.message).toBe('Pattern not found')
+    expect(e.lines).toEqual(['a b', 'a c'])
+  })
+
+  it('空 pattern 的 :s//x/ 报 No previous substitute pattern（简化：不复用）；未知 ex 命令报错', () => {
+    const e = new VimEngine({ lines: TEXT })
+    e.pressAll(':s//x/<CR>')
+    expect(e.message).toBe('No previous substitute pattern')
+    e.pressAll(':xyz<CR>')
+    expect(e.message).toBe('Not an editor command: xyz')
+  })
+})

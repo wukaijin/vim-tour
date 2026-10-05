@@ -44,6 +44,9 @@ export interface PressResult {
 export const isDigit = (k: Key) => k >= '1' && k <= '9'
 export const isDigit0 = (k: Key) => k >= '0' && k <= '9'
 
+/** 已知命名键；其余 `<`（如搜索 pattern 里的 `\<`）按普通字符处理 */
+const NAMED_KEY = /^<(?:Esc|CR|BS|C-[a-z])>$/
+
 /** 把 "2d3w<Esc>" 这类序列切成 Key[] */
 export function parseKeys(seq: string): Key[] {
   const out: Key[] = []
@@ -51,7 +54,7 @@ export function parseKeys(seq: string): Key[] {
   while (i < seq.length) {
     if (seq[i] === '<') {
       const close = seq.indexOf('>', i)
-      if (close !== -1) {
+      if (close !== -1 && NAMED_KEY.test(seq.slice(i, close + 1))) {
         out.push(seq.slice(i, close + 1))
         i = close + 1
         continue

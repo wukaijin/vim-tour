@@ -50,13 +50,13 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 8000 })
   await page.waitForTimeout(600)
   const nodeCount = await page.locator('.node').count()
-  nodeCount === 36 ? ok('T1 地图渲染 36 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
+  nodeCount === 44 ? ok('T1 地图渲染 44 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
   const currentCount = await page.locator('.node.current').count()
   currentCount === 1 && (await page.locator('.node.current .n-no').textContent()) === '1'
     ? ok('T1 ch1-01 为 current')
     : fail('T1 current 节点', `current 数 ${currentCount}`)
   const lockCount = await page.locator('.ch-lock').count()
-  lockCount === 4 ? ok('T1 ch2–ch5 整章锁定提示') : fail('T1 章节锁定提示', `ch-lock 数 ${lockCount}`)
+  lockCount === 5 ? ok('T1 ch2–ch6 整章锁定提示') : fail('T1 章节锁定提示', `ch-lock 数 ${lockCount}`)
   const warmupBar = await page.locator('.warmup').count()
   warmupBar === 0 ? ok('T1 无 due 时不出热身条') : fail('T1 热身条', '不应出现')
   await shot(page, 't01-map-initial')
@@ -153,7 +153,7 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
   const locks = await page.locator('.ch-lock').count()
-  locks === 3 ? ok('T7 ch2 已解锁，ch3/ch4/ch5 仍锁定') : fail('T7 章节锁', `ch-lock 数 ${locks}`)
+  locks === 4 ? ok('T7 ch2 已解锁，ch3–ch6 仍锁定') : fail('T7 章节锁', `ch-lock 数 ${locks}`)
   const doneAll = await page.locator('.node.done').count()
   doneAll === 7 ? ok('T7 ch1 全部 7 关 done') : fail('T7 ch1 done 数', `${doneAll}`)
   await shot(page, 't11-map-ch2-unlocked')
@@ -225,7 +225,7 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
   const locks2 = await page.locator('.ch-lock').count()
-  locks2 === 2 ? ok('T11 ch3 已解锁（ch4/ch5 仍锁定）') : fail('T11 ch3 解锁', `ch-lock 数 ${locks2}`)
+  locks2 === 3 ? ok('T11 ch3 已解锁（ch4–ch6 仍锁定）') : fail('T11 ch3 解锁', `ch-lock 数 ${locks2}`)
   const doneAll2 = await page.locator('.node.done').count()
   doneAll2 === 14 ? ok('T11 ch1+ch2 全部 14 关 done') : fail('T11 done 数', `${doneAll2}`)
   await shot(page, 't16-map-ch3-unlocked')
@@ -278,7 +278,7 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
   const locks3 = await page.locator('.ch-lock').count()
-  locks3 === 1 ? ok('T13 ch4 已解锁（ch5 仍锁定）') : fail('T13 ch4 解锁', `ch-lock 数 ${locks3}`)
+  locks3 === 2 ? ok('T13 ch4 已解锁（ch5/ch6 仍锁定）') : fail('T13 ch4 解锁', `ch-lock 数 ${locks3}`)
   const doneAll3 = await page.locator('.node.done').count()
   doneAll3 === 21 ? ok('T13 ch1–ch3 全部 21 关 done') : fail('T13 done 数', `${doneAll3}`)
   await shot(page, 't20-map-ch4-unlocked')
@@ -338,7 +338,7 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
   const locks4 = await page.locator('.ch-lock').count()
-  locks4 === 0 ? ok('T14 ch5 已解锁（锁定提示消失）') : fail('T14 ch5 解锁', `ch-lock 数 ${locks4}`)
+  locks4 === 1 ? ok('T14 ch5 已解锁（ch6 仍锁定）') : fail('T14 ch5 解锁', `ch-lock 数 ${locks4}`)
   const doneAll4 = await page.locator('.node.done').count()
   doneAll4 === 28 ? ok('T14 ch1–ch4 全部 28 关 done') : fail('T14 done 数', `${doneAll4}`)
   await shot(page, 't24-map-ch5-unlocked')
@@ -411,6 +411,82 @@ const run = async () => {
     cleared ? ok(`T15 ${id} 三 rep 通关`) : fail(`T15 ${id}`, '未出现结算屏')
   }
   await shot(page, 't29-result-ch5-grad')
+
+  // —— T16 ch6 解锁 + 搜索/替换全链路（N=3；cmdline 栏存证） ——
+  await page.getByRole('button', { name: '回到地图' }).click()
+  await page.waitForSelector('.chapter', { timeout: 3000 })
+  await page.waitForTimeout(300)
+  const locks5 = await page.locator('.ch-lock').count()
+  locks5 === 0 ? ok('T16 ch6 已解锁（锁定提示消失）') : fail('T16 ch6 解锁', `ch-lock 数 ${locks5}`)
+  const doneAll5 = await page.locator('.node.done').count()
+  doneAll5 === 36 ? ok('T16 ch1–ch5 全部 36 关 done') : fail('T16 done 数', `${doneAll5}`)
+  await shot(page, 't30-map-ch6-unlocked')
+
+  await page.locator('.node.current').click()
+  await page.waitForSelector('.card', { timeout: 3000 })
+  const ch6Card = await page.locator('.card .cmds > li').count()
+  ch6Card === 1 ? ok('T16 ch6-01 教学卡展示 1 个新命令(/)') : fail('T16 ch6-01 卡命令数', `${ch6Card}`)
+  await shot(page, 't31-card-ch6-search')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+
+  // cmdline 栏存证：/ 打开搜索输入后取消，不移动光标
+  await page.keyboard.press('/')
+  await page.waitForTimeout(200)
+  await shot(page, 't32-search-cmdline')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+
+  await press(page, '/todo<CR>dd')
+  await page.waitForTimeout(600)
+  const rep1ch6 = await page.locator('.toast').innerText().catch(() => '')
+  rep1ch6.includes('1/3') ? ok('T16 ch6 首轮成功显示 1/3（N=3）') : fail('T16 首轮反馈', rep1ch6)
+  await press(page, '/todo<CR>dd')
+  await page.waitForTimeout(500)
+  await press(page, '/todo<CR>dd')
+  await page.waitForSelector('.ticket', { timeout: 3000 })
+  await shot(page, 't33-result-ch6-01')
+  ok('T16 ch6-01 三轮连击通关')
+
+  // —— T17 ch6-02..08 三 rep 连续通关（N=3；:s 命令行在 05 存证） ——
+  const ch6Pars = {
+    'ch6-02': '/err<CR>ndd',
+    'ch6-03': '?tmp<CR>dd',
+    'ch6-04': '*cwnew<Esc>',
+    'ch6-05': ':s/cat/ox/<CR>',
+    'ch6-06': ':s/aa/zz/g<CR>',
+    'ch6-07': ':%s/old/fix/g<CR>',
+    'ch6-08': '/todo<CR>jndd:%s/todo/done/g<CR>',
+  }
+  for (const [id, par] of Object.entries(ch6Pars)) {
+    if (await page.locator('.ticket').count()) {
+      await page.getByRole('button', { name: '下一关' }).click()
+    } else {
+      await page.locator('.node.current').click()
+    }
+    await page.waitForSelector('.play', { timeout: 3000 })
+    if (await page.locator('.card').count()) await page.keyboard.press('Escape')
+    await page.waitForTimeout(150)
+    if (id === 'ch6-05') {
+      // :s 命令行存证：输入到一半截图，Esc 取消后正常通关（取消不改变文本）
+      await press(page, ':s/cat/ox')
+      await page.waitForTimeout(200)
+      await shot(page, 't34-substitute-cmdline')
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(150)
+    }
+    await press(page, par)
+    await page.waitForTimeout(500)
+    await press(page, par)
+    await page.waitForTimeout(500)
+    await press(page, par)
+    const cleared = await page
+      .waitForSelector('.ticket', { timeout: 3000 })
+      .then(() => true)
+      .catch(() => false)
+    cleared ? ok(`T17 ${id} 三 rep 通关`) : fail(`T17 ${id}`, '未出现结算屏')
+  }
+  await shot(page, 't35-result-ch6-grad')
 
   await browser.close()
 }
