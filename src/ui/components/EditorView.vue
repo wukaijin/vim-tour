@@ -57,12 +57,14 @@ function selSpan(line: number, text: string): [number, number] | null {
 /** 把文本按标记区间拆成段（无标记时整行一段） */
 function segments(text: string, line: number, ph: [number, number] | null): Seg[] {
   // sel 与 phantom 互斥：虚显仅存在于块插入 pending，彼时已无选区
-  const span = selSpan(line, text) ?? ph
+  const selSpanOfLine = selSpan(line, text)
+  const span = selSpanOfLine ?? ph
   if (!span) return [{ text, sel: false }]
   const [a, b] = span
   const segs: Seg[] = []
   if (a > 0) segs.push({ text: text.slice(0, a), sel: false })
-  segs.push({ text: text.slice(a, b), sel: false, phantom: ph !== null })
+  // 未键入时区间为空（b===a），只留光标位不出段
+  if (b > a) segs.push({ text: text.slice(a, b), sel: selSpanOfLine !== null, phantom: ph !== null })
   if (b < text.length) segs.push({ text: text.slice(b), sel: false })
   return segs
 }
@@ -73,12 +75,13 @@ const rows = computed(() =>
     const display = ph ? text.slice(0, ph.col) + ph.text + text.slice(ph.col) : text
     const phSpan: [number, number] | null = ph ? [ph.col, ph.col + ph.text.length] : null
     const isCursorLine = line === props.cursor.line
-    const col = isCursorLine ? props.cursor.col : -1
+    // 块插入虚显行在插入点（虚显文本末）也有光标——真实 vim 块插入为多行虚显光标
+    const col = isCursorLine ? props.cursor.col : phSpan ? phSpan[1] : -1
     const full = segments(display, line, phSpan)
     let before = full
     let after: Seg[] = []
-    if (isCursorLine) {
-      // 在光标列处劈开：[0, col) → before，光标格 = text[col]，(col, len] → after
+    if (col >= 0) {
+      // 在光标列处劈开：[0, col) → before，光标格 = display[col]，(col, len] → after
       before = []
       after = []
       let at = 0
@@ -89,15 +92,15 @@ const rows = computed(() =>
         else {
           const left = col - at
           const right = end - (col + 1)
-          if (left > 0) before.push({ text: seg.text.slice(0, left), sel: seg.sel })
-          if (right > 0) after.push({ text: seg.text.slice(seg.text.length - right), sel: seg.sel })
+          if (left > 0) before.push({ text: seg.text.slice(0, left), sel: seg.sel, phantom: seg.phantom })
+          if (right > 0) after.push({ text: seg.text.slice(seg.text.length - right), sel: seg.sel, phantom: seg.phantom })
         }
         at = end
       }
     }
     return {
       before,
-      at: isCursorLine ? (display[col] ?? ' ') : null,
+      at: col >= 0 ? (display[col] ?? ' ') : null,
       after,
       isCursorLine,
     }

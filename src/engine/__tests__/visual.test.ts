@@ -85,8 +85,11 @@ describe('visual block（C-v）', () => {
     expect(e.lines).toEqual(['# abc', '# defg', '# hi'])
   })
 
-  it('块插入虚显：刚进入尚未键入时为 null', () => {
-    expect(run(COLS, '<C-v>jjI').engine.blockInsertPending()).toBeNull()
+  it('块插入虚显：刚进入尚未键入时 text 为空串（供多行虚显光标定位）', () => {
+    expect(run(COLS, '<C-v>jjI').engine.blockInsertPending()).toEqual([
+      { line: 1, col: 0, text: '' },
+      { line: 2, col: 0, text: '' },
+    ])
   })
 
   it('块插入虚显：行不满足套用条件则不虚显（与 Esc 套用判定一致）', () => {

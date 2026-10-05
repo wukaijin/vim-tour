@@ -366,6 +366,8 @@ const run = async () => {
   await press(page, 'v$')
   await page.waitForTimeout(200)
   await shot(page, 't26-visual-highlight')
+  const charSel = await page.locator('.buffer .seg.sel').count()
+  charSel >= 1 ? ok(`T14 字符选区高亮 ${charSel} 段`) : fail('T14 字符选区高亮', `sel 段数 ${charSel}`)
   await press(page, 'd')
   await page.waitForTimeout(600)
   const rep1ch5 = await page.locator('.toast').innerText().catch(() => '')
@@ -401,6 +403,8 @@ const run = async () => {
       await press(page, '<C-v>jjl')
       await page.waitForTimeout(200)
       await shot(page, 't28-block-highlight')
+      const blkSel = await page.locator('.buffer .seg.sel').count()
+      blkSel === 3 ? ok('T15 ch5-05 块选高亮 3 段') : fail('T15 ch5-05 块选高亮', `sel 段数 ${blkSel}`)
       await press(page, '<Esc>gg')
       await page.waitForTimeout(150)
     }
@@ -413,6 +417,8 @@ const run = async () => {
       phSegs >= 2
         ? ok(`T15 ch5-06 块插入虚显（其余行 ${phSegs} 段）`)
         : fail('T15 ch5-06 块插入虚显', `phantom 段数 ${phSegs}`)
+      const curCount = await page.locator('.buffer .cursor').count()
+      curCount === 3 ? ok('T15 ch5-06 块插入多行虚显光标（3 个）') : fail('T15 ch5-06 多光标', `光标数 ${curCount}`)
       await press(page, '<Esc>')
       await page.waitForTimeout(500)
     } else {

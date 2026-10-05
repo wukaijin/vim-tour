@@ -1001,15 +1001,15 @@ export class VimEngine {
     return i
   }
 
-  /** 块插入会话的虚显（真实 vim 输入中会把已键文本实时显示在块内各行）：
-   *  返回其余各行应在 col 处叠加显示的已键文本；非块插入或尚未键入 → null */
+  /** 块插入会话的虚显（真实 vim 输入中会在块内各行显示虚显光标与已键文本）：
+   *  返回其余各行应在 col 处叠加显示的已键文本（未键入时为空串，仅供定位虚显光标）；
+   *  非块插入 → null */
   blockInsertPending(): { line: number; col: number; text: string }[] | null {
     const ctx = this.blockCtx
     if (!ctx) return null
     const first = this.lines[ctx.firstLine] ?? ''
     const delta = first.length - ctx.origLen
-    if (delta <= 0) return null
-    const typed = first.slice(ctx.col, ctx.col + delta)
+    const typed = delta > 0 ? first.slice(ctx.col, ctx.col + delta) : ''
     const spans: { line: number; col: number; text: string }[] = []
     for (let l = ctx.firstLine + 1; l <= ctx.lastLine; l++) {
       if (blockLineOk(this.lines[l] ?? '', ctx)) spans.push({ line: l, col: ctx.col, text: typed })
