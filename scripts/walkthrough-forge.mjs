@@ -71,6 +71,14 @@ const run = async () => {
   title?.includes('关卡工坊') ? ok('T1 工坊标题') : fail('T1 工坊标题', String(title))
   const emptyCount = await page.locator('.empty').count()
   emptyCount === 1 ? ok('T1 空库提示') : fail('T1 空库提示', `empty 数 ${emptyCount}`)
+  // 默认折叠态：多数人用离线演示，不需要看连接与 key
+  const subOpen = await page.locator('.sub').evaluate((el) => el.hasAttribute('open'))
+  !subOpen ? ok('T1 模型设置默认折叠') : fail('T1 模型设置默认折叠', 'details 默认展开')
+  // 折叠标题行必须自报当前服务，不展开也知道在用哪个
+  const serviceText = await page.locator('.sub-hint').textContent()
+  serviceText?.includes('离线演示')
+    ? ok('T1 折叠行速览当前服务')
+    : fail('T1 折叠行速览', String(serviceText))
   const providerDefault = await page.locator('select').last().inputValue()
   providerDefault === 'demo' ? ok('T1 默认离线演示（无需 key）') : fail('T1 默认服务', providerDefault)
   await shot(page, 't50-forge-entry')
@@ -173,6 +181,10 @@ const run = async () => {
   levelsLeft === 0 && emptyBack === 1 ? ok('T6 删除后回到空库') : fail('T6 删除', `剩 ${levelsLeft} 关`)
 
   // —— T7 设置持久化：模型设置与生成旋钮重载后不丢（非机密，透明存）——
+  // 模型设置折叠在 <details> 里（ForgeScreen 生成台底部），先展开再操作——
+  // 这也是真实用户路径：折叠态下 selectOption/fill 都会因不可见而超时
+  await page.locator('.sub-sum').click()
+  await page.waitForTimeout(200)
   await page.locator('select').last().selectOption('openai')
   await page.waitForTimeout(200)
   await page.getByPlaceholder('http://localhost:11434/v1').fill('http://127.0.0.1:11434/v1')
@@ -181,6 +193,8 @@ const run = async () => {
   await page.waitForTimeout(250)
   await page.reload()
   await page.waitForSelector('.forge', { timeout: 8000 })
+  await page.locator('.sub-sum').click()
+  await page.waitForTimeout(200)
   const providerAfter = await page.locator('select').last().inputValue()
   const urlAfter = await page.getByPlaceholder('http://localhost:11434/v1').inputValue()
   const modelAfter = await page.getByPlaceholder('qwen2.5-coder:7b').inputValue()

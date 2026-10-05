@@ -479,7 +479,8 @@ onBeforeUnmount(() => {
   gap: var(--sp-3);
   background: var(--warn-fill);
   border: 1px solid var(--warn);
-  border-radius: var(--r-keycap);
+  /* 横幅不是键帽：走 14px 一档（§8.1 圆角阶梯），6px 会读成键帽缩水的错档 */
+  border-radius: var(--r-input);
   padding: var(--sp-2) var(--sp-4);
   font-size: var(--fs-sm);
   color: var(--warn-ink);

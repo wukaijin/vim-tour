@@ -24,6 +24,8 @@ const efficiency = computed(() => {
   if (!r.value || r.value.keys === 0) return 0
   return Math.min(100, Math.round((r.value.par / r.value.keys) * 100))
 })
+// 只有连招里真出现文本输入键帽时才需要图例，否则是句废话
+const comboHasText = computed(() => r.value?.combo.some((c) => c.kind === 'type') ?? false)
 </script>
 
 <template>
@@ -72,6 +74,7 @@ const efficiency = computed(() => {
       <div class="t-combo" v-if="r.stars === 3 && r.combo.length > 0">
         <p class="combo-label">你的连招</p>
         <ComboStrip :chunks="r.combo" />
+        <p class="combo-legend" v-if="comboHasText">深色键帽 = 你键入的文本</p>
       </div>
 
       <div class="t-streak" v-if="!r.sandbox">
@@ -279,6 +282,13 @@ const efficiency = computed(() => {
   margin: 0;
   font-size: var(--fs-xs);
   letter-spacing: 0.12em;
+  color: var(--ink-2);
+}
+
+/* 深色键帽（tone="ink"，输入文本）无图例则零基础玩家无从判断含义 */
+.combo-legend {
+  margin: 0;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
 }
 

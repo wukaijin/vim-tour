@@ -64,6 +64,14 @@ const run = async () => {
   lockCount === 6 ? ok('T1 ch2–ch7 整章锁定提示') : fail('T1 章节锁定提示', `ch-lock 数 ${lockCount}`)
   const warmupBar = await page.locator('.warmup').count()
   warmupBar === 0 ? ok('T1 无 due 时不出热身条') : fail('T1 热身条', '不应出现')
+  // 跨章连接件：7 章之间应有 6 段虚线，且每段都得画出真实路径（空 d 会静默失效）
+  const bridges = page.locator('.bridge')
+  const bridgeCount = await bridges.count()
+  const bridgePaths = await bridges.locator('.bridge-line').count()
+  const bridgeD = await bridges.locator('.bridge-line').evaluateAll((els) => els.map((e) => e.getAttribute('d')))
+  bridgeCount === 6 && bridgePaths === 6 && bridgeD.every((d) => d && d.length > 0)
+    ? ok('T1 跨章连接件 6 段且路径非空')
+    : fail('T1 跨章连接件', `svg ${bridgeCount} 段 path ${bridgePaths} 段空路径 ${bridgeD.filter((d) => !d).length}`)
   await shot(page, 't01-map-initial')
 
   // —— T2 ch1-01：教学卡 → Esc 跳过 → par 通关 ——
@@ -224,6 +232,29 @@ const run = async () => {
     }
   }
   await shotResult(page, 't15-result-ch2-grad')
+  // 连招断行：毕业考 12 键帽必折成两行。断言「没有任何一行的行首是可见 dot」——
+  // 孤儿分隔符读成断句错误，是这屏最伤的成品度问题（截图目检才抓到，DOM 断言锁死）
+  const comboLines = await page.locator('.combo .grp').evaluateAll((els) => {
+    const out = []
+    let top = null
+    for (const el of els) {
+      const y = Math.round(el.offsetTop)
+      if (top === null || y > top) {
+        const dot = el.querySelector('.dot')
+        // 必须判「可见」而非「存在」：修法是 display:none，querySelector 仍会命中
+        const dotVisible = !!dot && getComputedStyle(dot).display !== 'none'
+        out.push({ hasVisibleDot: dotVisible, y })
+        top = y
+      }
+    }
+    return out
+  })
+  const orphanDots = comboLines.filter((l) => l.hasVisibleDot).length
+  comboLines.length >= 2
+    ? orphanDots === 0
+      ? ok(`T10 连招折成 ${comboLines.length} 行且无行首孤儿 dot`)
+      : fail('T10 连招行首 dot', `${orphanDots}/${comboLines.length} 行行首带 dot`)
+    : fail('T10 连招折行', `行数 ${comboLines.length}，毕业考连招应折行`)
 
   // —— T11 ch3 解锁（ch4 仍锁定）+ ch3-01 教学卡与双 rep ——
   await page.getByRole('button', { name: '回到地图' }).click()

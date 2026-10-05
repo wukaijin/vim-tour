@@ -79,6 +79,34 @@ function starsOf(node: NodeInfo): number {
   return progress.recordOf(node.level.id)?.bestStars ?? 0
 }
 
+/**
+ * 跨章连接件（PLAN §8.4「垂直蜿蜒路线」）：
+ * 路线原本只在章节卡内部闭合，章与章之间的纸底缝隙处断掉，「一条修行路」读不出来。
+ * 补一条虚线把上一章末节点与下一章首节点的横坐标接起来。
+ *
+ * 横坐标由 X_PATTERN 按各章**实际节点数**算，不写死索引——ch1–6 各 7 关、
+ * ch7 有 8 关，末节点的横向位置并不相同。
+ */
+const BRIDGE_H = 44
+
+/** 上一章末节点中心 x（count = 该章节点数） */
+function bridgeFromX(count: number): number {
+  return count > 0 ? nodeX(count - 1) + NODE / 2 : nodeX(0) + NODE / 2
+}
+
+/** 下一章首节点中心 x：X_PATTERN[0] 恒定 */
+function bridgeToX(): number {
+  return nodeX(0) + NODE / 2
+}
+
+function bridgePath(count: number): string {
+  const x0 = bridgeFromX(count)
+  const x1 = bridgeToX()
+  if (x0 === x1) return ''
+  const h = BRIDGE_H
+  return `M ${x0} 0 C ${x0} ${h * 0.5}, ${x1} ${h * 0.5}, ${x1} ${h}`
+}
+
 function nodeTitle(node: NodeInfo): string {
   const s = starsOf(node)
   return s > 0 ? `${node.level.title} · 最佳 ${s}★` : node.level.title
@@ -122,15 +150,25 @@ const warmupCount = computed(() => game.warmupDueIds.length)
       </span>
     </div>
 
-    <section v-for="{ meta, nodes } in chapters" :key="meta.id" class="chapter">
-      <header class="ch-band" :style="{ '--ch': meta.color }">
-        <span class="ch-no mono">CH{{ meta.id }}</span>
-        <h2 class="ch-title">{{ meta.title }}</h2>
-        <span class="ch-sub">{{ meta.subtitle }}</span>
-        <span v-if="nodes[0]?.state === 'locked'" class="ch-lock">
-          <KeyGlyph name="lock" :size="16" /> 完成上一章毕业考解锁
-        </span>
-      </header>
+    <template v-for="({ meta, nodes }, ci) in chapters" :key="meta.id">
+      <!-- 跨章连接件：上一章末节点 ↔ 本章首节点（虚线，区别于章内实线路线）。
+           包一层全宽 div 是因为 .map 是 flex column，svg 直接作 flex item 会被
+           align-items: stretch 拉满宽度，路径坐标就不再对得上 540px 的路线坐标系 -->
+      <div v-if="ci > 0" class="bridge-wrap">
+        <svg class="bridge" :width="540" :height="BRIDGE_H" aria-hidden="true">
+          <path :d="bridgePath(chapters[ci - 1]!.nodes.length)" class="bridge-line" />
+        </svg>
+      </div>
+
+      <section class="chapter">
+        <header class="ch-band" :style="{ '--ch': meta.color }">
+          <span class="ch-no mono">CH{{ meta.id }}</span>
+          <h2 class="ch-title">{{ meta.title }}</h2>
+          <span class="ch-sub">{{ meta.subtitle }}</span>
+          <span v-if="nodes[0]?.state === 'locked'" class="ch-lock">
+            <KeyGlyph name="lock" :size="16" /> 完成上一章毕业考解锁
+          </span>
+        </header>
 
       <div class="route" :style="{ height: `${routeHeight(nodes.length)}px` }">
         <svg class="route-svg" :width="540" :height="routeHeight(nodes.length)" aria-hidden="true">
@@ -162,7 +200,8 @@ const warmupCount = computed(() => game.warmupDueIds.length)
           <span v-if="node.state === 'current'" class="n-pointer" aria-hidden="true">▸ 你在这</span>
         </div>
       </div>
-    </section>
+      </section>
+    </template>
 
     <footer class="foot">
       <span class="foot-note">进度存在本机 localStorage，无账号无同步</span>
@@ -334,6 +373,28 @@ const warmupCount = computed(() => game.warmupDueIds.length)
   stroke-linecap: round;
 }
 
+/* 跨章连接件：虚线——章内路线是实线实体，这里是「路还没铺到下一章」的进度感，
+   且虚实在深浅底上都可辨（不依赖颜色第二通道）。
+   负 margin 抵消 .map 的 gap，让线两端真正咬住上下两张卡的边缘（否则中间悬空，
+   第一眼读成纸面杂点而不是「路连过去了」） */
+.bridge-wrap {
+  /* 上下各出血 24px（= .map 的 gap），使 44px 高的连接件恰好填满整个缝隙 */
+  margin: calc(var(--sp-6) * -1) 0;
+}
+
+.bridge {
+  display: block;
+  overflow: visible;
+}
+
+.bridge-line {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 5px;
+  stroke-linecap: round;
+  stroke-dasharray: 2 12;
+}
+
 .node-wrap {
   position: absolute;
   width: 68px;
@@ -364,7 +425,7 @@ const warmupCount = computed(() => game.warmupDueIds.length)
 .node.locked {
   background: var(--paper);
   box-shadow: inset 0 3px 6px rgba(43, 42, 38, 0.18);
-  color: #b9b29e;
+  color: var(--ink-3);
   cursor: not-allowed;
 }
 
