@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DAY_MS, applyProgressEvent, freshRecord } from '../retention'
 import { graduationClears } from '../graduation'
-import { chapterNodes, nextLevelId } from '../nodes'
+import { chapterNodes, levelLocked, nextLevelId } from '../nodes'
 import type { Level, LevelRecord } from '../types'
 
 const NOW = Date.UTC(2026, 9, 4)
@@ -93,5 +93,30 @@ describe('graduationClears（毕业考批量清关）', () => {
   it('无 record 的关卡跳过（不凭空造进度）', () => {
     const none = (): LevelRecord | null => null
     expect(graduationClears(levels[2]!, levels, none, NOW)).toEqual([])
+  })
+})
+
+describe('levelLocked（直链解锁守卫）', () => {
+  it('无进度：ch2 关卡锁定、ch1-01 可进、不存在的 id 视为锁定', () => {
+    const none = (): LevelRecord | null => null
+    expect(levelLocked('c2-1', levels, none, NOW)).toBe(true)
+    expect(levelLocked('c1-1', levels, none, NOW)).toBe(false)
+    expect(levelLocked('nope', levels, none, NOW)).toBe(true)
+  })
+
+  it('毕业考过后次章解锁', () => {
+    const recs: Record<string, LevelRecord> = {
+      'c1-1': cleared('c1-1'),
+      'c1-2': cleared('c1-2'),
+      'c1-g': cleared('c1-g'),
+    }
+    const get = (id: string): LevelRecord | null => recs[id] ?? null
+    expect(levelLocked('c2-1', levels, get, NOW)).toBe(false)
+  })
+
+  it('已清关的关卡重玩不锁定', () => {
+    const recs: Record<string, LevelRecord> = { 'c1-1': cleared('c1-1', 3) }
+    const get = (id: string): LevelRecord | null => recs[id] ?? null
+    expect(levelLocked('c1-1', levels, get, NOW)).toBe(false)
   })
 })

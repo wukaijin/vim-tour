@@ -7,9 +7,9 @@ import { useGameStore } from '../stores/game'
 import EditorView from '../components/EditorView.vue'
 import TargetDiff from '../components/TargetDiff.vue'
 import KeyEchoBar from '../components/KeyEchoBar.vue'
-import Keycap from '../components/Keycap.vue'
 import StreakLamps from '../components/StreakLamps.vue'
 import TeachingCard from '../components/TeachingCard.vue'
+import ToastItem from '../components/ToastItem.vue'
 
 const game = useGameStore()
 const rootEl = ref<HTMLElement | null>(null)
@@ -93,6 +93,17 @@ function reclaimFocus(): void {
   rootEl.value?.focus({ preventScroll: true })
 }
 
+/** 重来：引擎消息暂存（如 Pattern not found）随 run 一起归零，不留上一轮残影 */
+function onRestart(): void {
+  game.restart()
+  if (msgTimer) {
+    clearTimeout(msgTimer)
+    msgTimer = null
+  }
+  transientMsg.value = null
+  reclaimFocus()
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   // 每屏首个可聚焦元素 = 提示按钮（§8.5）；教学卡打开时焦点让给卡片的开始按钮
@@ -119,14 +130,24 @@ onBeforeUnmount(() => {
         <button class="tool hint2" :disabled="game.hintStage < 1" @click="game.useHint(2); reclaimFocus()">
           提示 · 解法 <span class="warn">−2★</span>
         </button>
-        <button class="tool restart" @click="game.restart(); reclaimFocus()">重来</button>
+        <button class="tool restart" @click="onRestart()">重来</button>
+        <button
+          v-if="teachCards.length && !game.warmup"
+          class="tool teach"
+          @click="game.reopenCard(); reclaimFocus()"
+        >
+          教学卡
+        </button>
       </div>
-      <div v-if="game.warmup" class="warmup-chip">
-        <span>热身 {{ warmupIndex }}/{{ warmupTotal }}</span>
-        <span class="mono timer" :class="{ low: warmupSeconds <= 10 }">{{ warmupSeconds }}s</span>
-        <button class="tool skip" @click="game.finishWarmup()">跳过热身</button>
+      <div class="tool-right">
+        <div v-if="game.warmup" class="warmup-chip">
+          <span>热身 {{ warmupIndex }}/{{ warmupTotal }}</span>
+          <span class="mono timer" :class="{ low: warmupSeconds <= 10 }">{{ warmupSeconds }}s</span>
+          <button class="tool skip" @click="game.finishWarmup()">跳过热身</button>
+        </div>
+        <StreakLamps v-else :k="game.streak" :n="game.requiredStreak" />
+        <button class="tool back" @click="game.gotoMap(); reclaimFocus()">返回地图</button>
       </div>
-      <StreakLamps v-else :k="game.streak" :n="game.requiredStreak" />
     </div>
 
     <header class="head">
@@ -173,15 +194,7 @@ onBeforeUnmount(() => {
         </template>
       </KeyEchoBar>
 
-      <div v-if="game.toast" class="toast" :class="game.toast.tone" :key="game.toast.id" role="status">
-        <span>{{ game.toast.text }}</span>
-        <Keycap
-          v-if="game.toast.keycap"
-          :label="game.toast.keycap"
-          size="sm"
-          :tone="game.toast.tone === 'err' ? 'err' : 'plain'"
-        />
-      </div>
+      <ToastItem v-if="game.toast" :toast="game.toast" placement="dock" />
     </div>
 
     <TeachingCard
@@ -216,6 +229,12 @@ onBeforeUnmount(() => {
 .tool-left {
   display: flex;
   gap: var(--sp-2);
+}
+
+.tool-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
 }
 
 .tool {
@@ -349,39 +368,5 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-/* toast：贴在停靠区上方，描边语义色取代饱和实底（不再孤悬在视口 87% 高处） */
-.toast {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + var(--sp-3));
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  background: var(--surface);
-  color: var(--ink);
-  border: 2px solid var(--toast-accent, var(--ink-2));
-  border-radius: var(--r-input);
-  box-shadow: var(--shadow-1);
-  padding: var(--sp-1) var(--sp-4);
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-  animation: toast-in var(--dur-base) var(--ease-out);
-  z-index: 5;
-}
-
-.toast.ok {
-  --toast-accent: var(--ok-ink);
-}
-
-.toast.err {
-  --toast-accent: var(--err-ink);
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 8px);
-  }
-}
+/* toast 外观与锚点见 ToastItem.vue（对局屏贴停靠区，地图屏悬浮底部） */
 </style>

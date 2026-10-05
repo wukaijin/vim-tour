@@ -63,3 +63,10 @@ export function nextLevelId(levels: readonly Level[], records: RecordGetter, now
   }
   return null
 }
+
+/** 单关是否处于锁定态（含前序关未清 / 整章未解锁）；找不到的 id 视为锁定 */
+export function levelLocked(levelId: string, levels: readonly Level[], records: RecordGetter, now: number): boolean {
+  const lv = levels.find((l) => l.id === levelId)
+  if (!lv) return true
+  return chapterNodes(lv.chapter, levels, records, now).some((n) => n.level.id === levelId && n.state === 'locked')
+}

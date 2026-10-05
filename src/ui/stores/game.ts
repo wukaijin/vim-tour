@@ -8,7 +8,7 @@ import { variantForDate } from '../../game/variant'
 import { applyProgressEvent, retentionOf } from '../../game/retention'
 import { graduationClears } from '../../game/graduation'
 import type { ComboChunk } from '../../game/combo'
-import { nextLevelId } from '../../game/nodes'
+import { nextLevelId, levelLocked } from '../../game/nodes'
 import { dismissWarmupToday, isWarmupDismissed, selectWarmup } from '../../game/warmup'
 import type { Level, LevelRecord, Stars } from '../../game/types'
 import { detectStorage } from '../../storage/progress'
@@ -112,9 +112,11 @@ export const useGameStore = defineStore('game', () => {
     recentKeys.value = [...recentKeys.value.slice(-7), key]
   }
 
-  function openLevel(levelId: string): void {
+  /** 进入关卡对局；false = 未找到或处于锁定态（地图锁定节点不可点，这里防 URL 直达绕过解锁） */
+  function openLevel(levelId: string): boolean {
     const level = levelById(levelId)
-    if (!level) return
+    if (!level) return false
+    if (levelLocked(levelId, levels.value, (id) => progress.recordOf(id), Date.now())) return false
     const session = new LevelSession({
       level,
       record: progress.recordOf(levelId),
@@ -127,6 +129,7 @@ export const useGameStore = defineStore('game', () => {
     recentKeys.value = []
     result.value = null
     screen.value = 'play'
+    return true
   }
 
   function closeCard(): void {
@@ -134,6 +137,13 @@ export const useGameStore = defineStore('game', () => {
     const lv = active.value?.level
     if (lv) markCardSeen(storage, lv.id)
     cardVisible.value = false
+  }
+
+  /** 主动重看教学卡（工具栏入口）：只影响展示，不重置已读标记、不涉星级 */
+  function reopenCard(): void {
+    const lv = active.value?.level
+    if (!lv || !lv.teaches || lv.teaches.length === 0) return
+    cardVisible.value = true
   }
 
   function useHint(stage: 1 | 2): void {
@@ -198,6 +208,8 @@ export const useGameStore = defineStore('game', () => {
     if (a.kind === 'level') {
       const out = a.session.restart()
       rev.value++
+      // 换了全新 run（击键/pending 已归零），回显栏的最近键帽同步清空，不留上一轮残影
+      recentKeys.value = []
       if (out.kind === 'rep-failure') {
         showFlash('rep-err')
         showToast('本轮重来：连续成功已清零', 'err')
@@ -360,6 +372,8 @@ export const useGameStore = defineStore('game', () => {
     boot,
     openLevel,
     closeCard,
+    reopenCard,
+    showToast,
     useHint,
     feed,
     restart,

@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useGameStore } from './ui/stores/game'
+import { installRouter } from './ui/router'
 import MapScreen from './ui/screens/MapScreen.vue'
 import PlayScreen from './ui/screens/PlayScreen.vue'
 import ResultScreen from './ui/screens/ResultScreen.vue'
+import ToastItem from './ui/components/ToastItem.vue'
 
 const game = useGameStore()
 
-onMounted(() => game.boot())
+onMounted(() => {
+  game.boot()
+  installRouter(game)
+})
 </script>
 
 <template>
@@ -17,6 +22,8 @@ onMounted(() => game.boot())
   <MapScreen v-else-if="game.screen === 'map'" />
   <PlayScreen v-else-if="game.screen === 'play'" />
   <ResultScreen v-else />
+  <!-- 地图态的全局提示（拒绝直链/热身结束）：对局屏的 toast 由 PlayScreen 自渲染 -->
+  <ToastItem v-if="game.levelsReady && game.screen === 'map' && game.toast" :toast="game.toast" placement="float" />
 </template>
 
 <style scoped>
