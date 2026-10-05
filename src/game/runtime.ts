@@ -30,12 +30,13 @@ export class LevelRun {
   usedHint = false
   usedUndo = false
   status: RunStatus = 'playing'
-  private readonly filter: KeyFilter
+  /** null = 不限（PLAN §2.5 第 5 章起白名单完全放开） */
+  private readonly filter: KeyFilter | null
 
-  constructor(variant: LevelText, allowedKeys: string[]) {
+  constructor(variant: LevelText, allowedKeys?: string[] | null) {
     this.engine = new VimEngine({ lines: variant.start, cursor: variant.cursor })
     this.target = [...variant.target]
-    this.filter = new KeyFilter(allowedKeys)
+    this.filter = allowedKeys && allowedKeys.length > 0 ? new KeyFilter(allowedKeys) : null
     this.par = Math.max(1, parseKeys(variant.parKeys).length)
   }
 
@@ -94,7 +95,8 @@ export class LevelRun {
 
   /**
    * 白名单只作用于 normal/visual 命令层（PLAN §2.5——教学进度管的是命令，不是打字）；
-   * insert / cmdline 是文本输入态：可打印字符与基本编辑键直接放行。
+   * insert / cmdline 是文本输入态：可打印字符与基本编辑键直接放行；
+   * 未配置白名单（ch5+）时命令层也全放行。
    */
   private passesFilter(key: Key): boolean {
     const m = this.engine.mode
@@ -104,6 +106,6 @@ export class LevelRun {
     if (m === 'cmdline') {
       return key.length === 1 || key === '<Esc>' || key === '<BS>' || key === '<CR>'
     }
-    return this.filter.feed(key) !== 'reject'
+    return this.filter === null || this.filter.feed(key) !== 'reject'
   }
 }

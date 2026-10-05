@@ -56,6 +56,15 @@ export function validateLevels(levels: Level[]): ValidationIssue[] {
       push('shape', '毕业考不教新命令（teaches 应为空）')
     }
 
+    // §2.5：ch1–4 白名单必配（只放已教键），ch5+ 必须省略（完全放开）
+    if (level.chapter <= 4) {
+      if (!level.allowedKeys || level.allowedKeys.length === 0) {
+        push('allowed-keys', 'ch1–4 关卡必须显式配置非空白名单（PLAN §2.5）')
+      }
+    } else if (level.allowedKeys) {
+      push('allowed-keys', `第 ${level.chapter} 章起白名单完全放开，不得配置 allowedKeys（PLAN §2.5）`)
+    }
+
     for (let v = 0; v < level.texts.length; v++) {
       const t = level.texts[v]!
 
@@ -71,8 +80,8 @@ export function validateLevels(levels: Level[]): ValidationIssue[] {
 
       if (parseKeys(t.parKeys).length === 0) push('shape', `变体${v + 1} parKeys 为空`)
 
-      // ④ allowedKeys ⊆ 已教集 ∪ 往章
-      const untaught = level.allowedKeys.filter((k) => !isTaughtSeq(k, level.chapter))
+      // ④ allowedKeys ⊆ 已教集 ∪ 往章（ch5+ 无白名单，自然跳过）
+      const untaught = (level.allowedKeys ?? []).filter((k) => !isTaughtSeq(k, level.chapter))
       if (untaught.length > 0) {
         push('allowed-keys', `白名单含未教序列：${untaught.map((k) => JSON.stringify(k)).join(' ')}（截至第 ${level.chapter} 章）`)
       }

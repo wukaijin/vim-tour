@@ -35,6 +35,7 @@ const view = computed(() => {
     pending: r.pendingEcho(),
     cmdline: r.engine.cmdline?.text ?? '',
     message: r.engine.message,
+    selection: r.mode.startsWith('visual') ? r.engine.selectionRange() : null,
   }
 })
 const level = computed(() => game.activeLevel)
@@ -139,6 +140,7 @@ onBeforeUnmount(() => {
         :cursor="cursor"
         :mode="mode"
         :grid="level.grid !== false"
+        :selection="view?.selection ?? null"
       />
       <TargetDiff
         class="pane"

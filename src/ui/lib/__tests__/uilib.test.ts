@@ -48,9 +48,11 @@ describe('eventToKey', () => {
     expect(eventToKey(ev('Escape'))).toBe('<Esc>')
   })
 
-  it('Ctrl+R 映射为 redo；其他组合键与方向键忽略', () => {
+  it('Ctrl+R 映射为 redo；Ctrl+V 映射为块可视化（ch5）；其余组合与方向键忽略', () => {
     expect(eventToKey(ev('r', { ctrlKey: true }))).toBe('<C-r>')
     expect(eventToKey(ev('r', { metaKey: true }))).toBe('<C-r>')
+    expect(eventToKey(ev('v', { ctrlKey: true }))).toBe('<C-v>')
+    expect(eventToKey(ev('v', { metaKey: true }))).toBeNull() // Cmd+V 是系统粘贴
     expect(eventToKey(ev('c', { ctrlKey: true }))).toBeNull()
     expect(eventToKey(ev('ArrowLeft'))).toBeNull()
   })

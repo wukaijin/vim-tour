@@ -13,11 +13,14 @@ export interface KeyEventLike {
  * 键盘事件 → 引擎 Key token。
  * 可打印单字符直通；命名键映射为尖括号形式；方向键刻意忽略（vim 用 hjkl）；
  * IME 组合期间不产生按键。
+ * Ctrl 组合只放行 <C-r>（重做）与 <C-v>（块可视化，ch5 起）——其余组合键忽略。
  */
 export function eventToKey(e: KeyEventLike): Key | null {
   if (e.isComposing) return null
   if (e.ctrlKey || e.metaKey || e.altKey) {
-    return e.key === 'r' && (e.ctrlKey || e.metaKey) ? '<C-r>' : null
+    if (e.key === 'r' && (e.ctrlKey || e.metaKey)) return '<C-r>'
+    if (e.key === 'v' && e.ctrlKey && !e.metaKey && !e.altKey) return '<C-v>'
+    return null
   }
   switch (e.key) {
     case 'Enter':

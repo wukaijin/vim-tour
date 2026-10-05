@@ -362,6 +362,62 @@ export const COMMANDS: CommandMeta[] = [
     seqs: ['ip', 'dip', 'cip', 'yip'],
     chapter: 4,
   },
+
+  // ========== 第 5 章 · Visual 模式（PLAN §4；本章起按键白名单完全放开 §2.5） ==========
+  {
+    id: 'v',
+    keys: 'v',
+    mode: 'visual',
+    desc: '进入字符可视化：用移动命令扩大选区，再按 d/c/y/J 作用在选区上；v 或 Esc 退出。',
+    example: { keys: 'vlld', effect: '向右选 4 个字符后删掉' },
+    seqs: ['v'],
+    chapter: 5,
+  },
+  {
+    id: 'V',
+    keys: 'V',
+    mode: 'visual',
+    desc: '进入行可视化：以整行为单位选择，Vj 多选一行；Vd 删整段、Vy 复制整段、Vc 整块重写。',
+    example: { keys: 'Vjd', effect: '选中两行一起删掉' },
+    seqs: ['V'],
+    chapter: 5,
+  },
+  {
+    id: 'C-v',
+    keys: '<C-v>',
+    mode: 'visual',
+    desc: '进入块可视化：按列选出一个矩形，跨行作用在同一列上——批量删列、加前缀、补行尾全靠它。',
+    example: { keys: '<C-v>jjld', effect: '三行的前两列一起删掉' },
+    seqs: ['<C-v>'],
+    chapter: 5,
+  },
+  {
+    id: 'indent',
+    keys: '> <',
+    mode: 'any',
+    desc: '缩进：> 右移一级（2 空格），< 左移一级。可视化下 Vj> 两行一起缩进。',
+    example: { keys: 'Vj>', effect: '选中两行整体右移一级缩进' },
+    seqs: ['>', '<'],
+    chapter: 5,
+  },
+  {
+    id: 'blockI',
+    keys: 'I',
+    mode: 'visual',
+    desc: '块可视化下按 I：在块的左缘插入——首行输入的文本，Esc 后套用到块的每一行。',
+    example: { keys: '<C-v>jjI# <Esc>', effect: '三行行首都加上 # ' },
+    seqs: ['I'],
+    chapter: 5,
+  },
+  {
+    id: 'blockA',
+    keys: 'A',
+    mode: 'visual',
+    desc: '块可视化下按 A：在块的右缘之后追加——首行输入的文本，Esc 后套用到块的每一行；太短的行跳过。',
+    example: { keys: '<C-v>jjllllA;<Esc>', effect: '三行行尾都补上分号' },
+    seqs: ['A'],
+    chapter: 5,
+  },
 ]
 
 const byId = new Map(COMMANDS.map((c) => [c.id, c]))

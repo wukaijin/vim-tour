@@ -56,6 +56,18 @@ describe('LevelRun：diff 制任务运行时', () => {
     expect(run.stars()).toBe(3)
   })
 
+  it('ch5 起白名单完全放开：未配置时任意命令键放行（PLAN §2.5）', () => {
+    const run = new LevelRun(
+      variant({ start: ['foo bar'], target: ['bar'], cursor: { line: 0, col: 0 }, parKeys: 'dw' }),
+    )
+    expect(run.feed('<C-v>').kind).toBe('accepted') // ch1–4 从未教的键
+    run.feed('<Esc>')
+    run.feed('d')
+    const r = run.feed('w')
+    expect(r).toMatchObject({ kind: 'rep-success' })
+    expect(run.keys).toBe(4) // 放开档位下每个键都计击键
+  })
+
   it('insert 模式下任意可打印字符放行（白名单只管命令层）', () => {
     const run = new LevelRun(variant({ start: ['bc'], target: ['bZc'], cursor: { line: 0, col: 1 } }), [
       'i',

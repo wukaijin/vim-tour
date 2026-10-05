@@ -24,8 +24,11 @@ export interface Level {
   brief: string
   /** 两级提示：[命令类别提示, 完整解法提示]；看任一级封顶 1 星（PLAN §6） */
   hints: [string, string]
-  /** 按键白名单（normal/visual 命令序列；insert/cmdline 是文本输入态不走白名单） */
-  allowedKeys: string[]
+  /**
+   * 按键白名单（normal/visual 命令序列；insert/cmdline 是文本输入态不走白名单）。
+   * 缺省 = 不限：第 5 章起完全放开，等同真实 vim 自由度（PLAN §2.5）。
+   */
+  allowedKeys?: string[]
   /** 含 CJK 时置 false：栅格类线索退场（PLAN §9.2），默认 true */
   grid?: boolean
   /** 本关新教的命令（content/commands.ts 的 id）；教学卡据此渲染，可为空 */

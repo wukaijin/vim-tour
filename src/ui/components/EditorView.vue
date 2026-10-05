@@ -5,26 +5,85 @@ import type { Cursor, Mode } from '../../engine'
 /**
  * 纸面编辑器（PLAN §8.4）：亮底、1px edge 描边、硬阴影、弱化行号槽。
  * 光标是全屏最亮元素：normal=实心块、insert=竖线；闪烁尊重 reduced-motion。
+ * visual 模式下选区以 brand 浅底高亮（char=行内段 / line=整行 / block=列段，短行截断）。
  */
+interface VisualSelection {
+  start: Cursor
+  end: Cursor
+  kind: 'char' | 'line' | 'block'
+}
+
+interface Seg {
+  text: string
+  sel: boolean
+}
+
 const props = withDefaults(
   defineProps<{
     lines: string[]
     cursor: Cursor
     mode: Mode
     grid?: boolean
+    selection?: VisualSelection | null
   }>(),
-  { grid: true },
+  { grid: true, selection: null },
 )
+
+/** 本行选区列区间 [a, b)；行不在选区内或区间为空 → null */
+function selSpan(line: number, text: string): [number, number] | null {
+  const s = props.selection
+  if (!s || line < s.start.line || line > s.end.line) return null
+  if (s.kind === 'line') return text.length > 0 ? [0, text.length] : null
+  if (s.kind === 'block') {
+    const b = Math.min(s.end.col + 1, text.length)
+    return s.start.col < b ? [s.start.col, b] : null
+  }
+  const a = line === s.start.line ? s.start.col : 0
+  const b = line === s.end.line ? Math.min(s.end.col + 1, text.length) : text.length
+  return a < b ? [a, b] : null
+}
+
+/** 把文本按选区拆成段（无选区时整行一段） */
+function segments(text: string, line: number): Seg[] {
+  const span = selSpan(line, text)
+  if (!span) return [{ text, sel: false }]
+  const [a, b] = span
+  const segs: Seg[] = []
+  if (a > 0) segs.push({ text: text.slice(0, a), sel: false })
+  segs.push({ text: text.slice(a, b), sel: true })
+  if (b < text.length) segs.push({ text: text.slice(b), sel: false })
+  return segs
+}
 
 const rows = computed(() =>
   props.lines.map((text, line) => {
     const isCursorLine = line === props.cursor.line
     const col = isCursorLine ? props.cursor.col : -1
+    const full = segments(text, line)
+    let before = full
+    let after: Seg[] = []
+    if (isCursorLine) {
+      // 在光标列处劈开：[0, col) → before，光标格 = text[col]，(col, len] → after
+      before = []
+      after = []
+      let at = 0
+      for (const seg of full) {
+        const end = at + seg.text.length
+        if (end <= col) before.push(seg)
+        else if (at >= col + 1) after.push(seg)
+        else {
+          const left = col - at
+          const right = end - (col + 1)
+          if (left > 0) before.push({ text: seg.text.slice(0, left), sel: seg.sel })
+          if (right > 0) after.push({ text: seg.text.slice(seg.text.length - right), sel: seg.sel })
+        }
+        at = end
+      }
+    }
     return {
-      text,
-      before: isCursorLine ? text.slice(0, col) : text,
-      at: isCursorLine ? (text[col] ?? ' ') : '',
-      after: isCursorLine ? text.slice(col + 1) : '',
+      before,
+      at: isCursorLine ? (text[col] ?? ' ') : null,
+      after,
       isCursorLine,
     }
   }),
@@ -49,14 +108,14 @@ const modeLabel: Record<Mode, string> = {
       <div v-for="(row, i) in rows" :key="i" class="line" :class="{ active: row.isCursorLine }">
         <span class="gutter">{{ i + 1 }}</span>
         <span class="text"
-          >{{ row.before
-          }}<span
-            v-if="row.isCursorLine"
+          ><span v-for="(s, k) in row.before" :key="'b' + k" class="seg" :class="{ sel: s.sel }">{{ s.text }}</span
+          ><span
+            v-if="row.at !== null"
             class="cursor"
             :class="mode === 'insert' ? 'bar' : 'block'"
             :data-ch="row.at"
           ></span
-          >{{ row.after }}</span
+          ><span v-for="(s, k) in row.after" :key="'a' + k" class="seg" :class="{ sel: s.sel }">{{ s.text }}</span></span
         >
       </div>
     </div>
@@ -141,6 +200,12 @@ const modeLabel: Record<Mode, string> = {
 
 .nogrid .text {
   background-image: none;
+}
+
+/* visual 选区高亮（真实 vim 为反白；键帽母题下用 brand 浅底） */
+.seg.sel {
+  background: color-mix(in srgb, var(--brand) 24%, var(--surface));
+  border-radius: 3px;
 }
 
 /* —— 光标：全屏最亮元素 —— */
