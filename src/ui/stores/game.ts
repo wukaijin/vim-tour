@@ -7,6 +7,7 @@ import { LevelSession } from '../../game/session'
 import { variantForDate } from '../../game/variant'
 import { applyProgressEvent, retentionOf } from '../../game/retention'
 import { graduationClears } from '../../game/graduation'
+import type { ComboChunk } from '../../game/combo'
 import { nextLevelId } from '../../game/nodes'
 import { dismissWarmupToday, isWarmupDismissed, selectWarmup } from '../../game/warmup'
 import type { Level, LevelRecord, Stars } from '../../game/types'
@@ -30,6 +31,8 @@ export interface ResultPayload {
   bestStars: number
   graduation: boolean
   nextLevelId: string | null
+  /** par 连招组块（PLAN §2.4D：仅 3 星结算屏渲染） */
+  combo: ComboChunk[]
 }
 
 export interface Toast {
@@ -158,7 +161,7 @@ export const useGameStore = defineStore('game', () => {
       if (out.kind === 'rep-success') {
         progress.put(out.record)
         if (out.levelCleared) {
-          finishLevel(a.level, out.stars, out.keys, a.session.run.par)
+          finishLevel(a.level, out.stars, out.keys, a.session.run.par, a.session.run.combo)
         } else {
           showFlash('rep-ok')
           showToast(`✓ 本轮完成（${out.streak}/${a.session.requiredStreak}）`, 'ok')
@@ -206,7 +209,7 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function finishLevel(level: Level, stars: Stars, keys: number, par: number): void {
+  function finishLevel(level: Level, stars: Stars, keys: number, par: number, combo: ComboChunk[]): void {
     const rec = progress.recordOf(level.id)
     const requiredStreak =
       level.requiredStreak ?? (level.chapter <= 1 ? 1 : level.chapter <= 3 ? 2 : 3)
@@ -222,6 +225,7 @@ export const useGameStore = defineStore('game', () => {
       stars,
       keys,
       par,
+      combo,
       requiredStreak,
       bestStars: (rec ? rec.bestStars : 0) as Stars,
       graduation: !!level.graduation,

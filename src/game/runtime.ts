@@ -1,5 +1,7 @@
 import { KeyFilter, VimEngine, parseKeys } from '../engine'
 import type { Key } from '../engine'
+import { comboOf } from './combo'
+import type { ComboChunk } from './combo'
 import { starsFor } from './stars'
 import type { LevelText, Stars } from './types'
 
@@ -26,6 +28,8 @@ export class LevelRun {
   readonly engine: VimEngine
   readonly target: readonly string[]
   readonly par: number
+  /** par 连招展示模型（PLAN §2.4D：仅 3 星结算屏渲染） */
+  readonly combo: ComboChunk[]
   keys = 0
   usedHint = false
   usedUndo = false
@@ -38,6 +42,7 @@ export class LevelRun {
     this.target = [...variant.target]
     this.filter = allowedKeys && allowedKeys.length > 0 ? new KeyFilter(allowedKeys) : null
     this.par = Math.max(1, parseKeys(variant.parKeys).length)
+    this.combo = comboOf(variant)
   }
 
   get lines(): string[] {

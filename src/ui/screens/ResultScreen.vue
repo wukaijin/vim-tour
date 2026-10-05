@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useGameStore } from '../stores/game'
+import ComboStrip from '../components/ComboStrip.vue'
 import StarRow from '../components/StarRow.vue'
 import StreakLamps from '../components/StreakLamps.vue'
 
@@ -52,6 +53,11 @@ const efficiency = computed(() => {
         <p class="eff-note" v-if="r.stars === 3">≤ par 且未用提示与撤销——满星路线</p>
         <p class="eff-note" v-else-if="r.stars === 2">再省 {{ Math.max(0, r.keys - r.par) }} 键可冲 3★</p>
         <p class="eff-note" v-else>完成即得 1★；想拿高星就少敲几键</p>
+      </div>
+
+      <div class="t-combo" v-if="r.stars === 3 && r.combo.length > 0">
+        <p class="combo-label">你的连招</p>
+        <ComboStrip :chunks="r.combo" />
       </div>
 
       <div class="t-streak">
@@ -196,6 +202,23 @@ const efficiency = computed(() => {
   margin: 0;
   text-align: center;
   font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.t-combo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  align-items: center;
+  padding: var(--sp-2) var(--sp-2);
+  border: 1px dashed var(--edge);
+  border-radius: var(--r-input);
+}
+
+.combo-label {
+  margin: 0;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.12em;
   color: var(--ink-2);
 }
 

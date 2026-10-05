@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { diffLines } from '../diff'
-import { eventToKey } from '../keys'
+import { eventToKey, keycapLabel } from '../keys'
 
 describe('diffLines', () => {
   it('完全一致时全是 same', () => {
@@ -59,5 +59,23 @@ describe('eventToKey', () => {
 
   it('IME 组合期间不产生按键', () => {
     expect(eventToKey(ev('a', { isComposing: true }))).toBeNull()
+  })
+})
+
+describe('keycapLabel（连招/回显键帽显示名）', () => {
+  it('命名键剥尖括号', () => {
+    expect(keycapLabel('<Esc>')).toBe('Esc')
+    expect(keycapLabel('<C-v>')).toBe('C-v')
+    expect(keycapLabel('<CR>')).toBe('CR')
+  })
+
+  it('单字符键原样——< > 是缩进命令键不是包裹（裸 replace 曾渲染成空键帽）', () => {
+    expect(keycapLabel('<')).toBe('<')
+    expect(keycapLabel('>')).toBe('>')
+    expect(keycapLabel('d')).toBe('d')
+  })
+
+  it('空格以 ␣ 显形', () => {
+    expect(keycapLabel(' ')).toBe('␣')
   })
 })

@@ -41,6 +41,15 @@ export function isGameplayKey(e: KeyEventLike): boolean {
   return eventToKey(e) !== null
 }
 
+/**
+ * 键的键帽显示名：命名键剥尖括号（<Esc> → Esc），空格以 ␣ 显形（与 KeyEchoBar 同口径）。
+ * 单字符键原样返回——`<` `>` 是缩进命令键，不是尖括号包裹（曾因裸 replace 渲染成空键帽）。
+ */
+export function keycapLabel(k: Key): string {
+  if (k.length === 1) return k === ' ' ? '␣' : k
+  return k.replace(/^<|>$/g, '')
+}
+
 /** 焦点在交互元素上时，按钮激活键要放行给浏览器，避免杀死键盘可达性 */
 const ACTIVATION_KEYS = new Set(['Enter', ' ', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
 

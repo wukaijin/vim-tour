@@ -13,6 +13,11 @@ const consoleErrors = []
 const ok = (name) => results.push(['PASS', name])
 const fail = (name, detail) => results.push(['FAIL', `${name} :: ${detail}`])
 const shot = (page, name) => page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false })
+// 结算屏取证：星级 0/90/180ms 延迟弹入 + 效率条 360ms 扫入，500ms 截到中间帧，等满再截
+const shotResult = async (page, name) => {
+  await page.waitForTimeout(950)
+  await shot(page, name)
+}
 
 const press = async (page, seq) => {
   // seq: 'iq<Esc>' 之类的 parseKeys 记法；孤立 '<'/'>'（缩进命令）按字面键处理
@@ -73,7 +78,7 @@ const run = async () => {
   await shot(page, 't03-play-empty')
   await press(page, 'iq<Esc>')
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await shot(page, 't04-result-ch1-01')
+  await shotResult(page, 't04-result-ch1-01')
   const starsText = await page.locator('.t-stars .stars').getAttribute('aria-label')
   starsText === '3 星' ? ok('T2 ch1-01 par 通关 3★') : fail('T2 星级', starsText)
   const eff = await page.locator('.eff-nums').innerText()
@@ -115,7 +120,7 @@ const run = async () => {
   // —— T6 ch1-02..06 par 连续通关（教学卡逐关跳过） ——
   await press(page, 'xjxjx') // ch1-02 完成（重来后 buffer 复位）
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await shot(page, 't08-result-ch1-02')
+  await shotResult(page, 't08-result-ch1-02')
 
   const pars = {
     'ch1-03': 'as<Esc>jas<Esc>',
@@ -144,7 +149,7 @@ const run = async () => {
       .catch(() => false)
     cleared ? ok(`T6 ${id} par 通关`) : fail(`T6 ${id}`, '未出现结算屏')
   }
-  await shot(page, 't10-result-graduation')
+  await shotResult(page, 't10-result-graduation')
   const gradNote = await page.locator('.t-grad').count()
   gradNote === 1 ? ok('T6 毕业考结算含批量清关说明') : fail('T6 毕业考说明', '缺失')
 
@@ -170,7 +175,7 @@ const run = async () => {
   await shot(page, 't12-ch2-rep1')
   await press(page, 'xwxwx')
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await shot(page, 't13-result-ch2-01')
+  await shotResult(page, 't13-result-ch2-01')
   ok('T8 ch2-01 两轮连击通关')
 
   // —— T9 提示两级 ——
@@ -218,7 +223,7 @@ const run = async () => {
       await page.waitForTimeout(150)
     }
   }
-  await shot(page, 't15-result-ch2-grad')
+  await shotResult(page, 't15-result-ch2-grad')
 
   // —— T11 ch3 解锁（ch4 仍锁定）+ ch3-01 教学卡与双 rep ——
   await page.getByRole('button', { name: '回到地图' }).click()
@@ -241,7 +246,7 @@ const run = async () => {
   await page.waitForTimeout(500)
   await press(page, 'dwdw')
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await shot(page, 't18-result-ch3-01')
+  await shotResult(page, 't18-result-ch3-01')
   ok('T11 ch3-01 两轮连击通关')
 
   // —— T12 ch3-02..07 双 rep 连续通关（N=2） ——
@@ -271,7 +276,7 @@ const run = async () => {
       .catch(() => false)
     cleared ? ok(`T12 ${id} 双 rep 通关`) : fail(`T12 ${id}`, '未出现结算屏')
   }
-  await shot(page, 't19-result-ch3-grad')
+  await shotResult(page, 't19-result-ch3-grad')
 
   // —— T13 ch4 解锁 + ch4-01 教学卡与 N=3 三连击 ——
   await page.getByRole('button', { name: '回到地图' }).click()
@@ -299,7 +304,7 @@ const run = async () => {
   await page.waitForTimeout(500)
   await press(page, 'ciwnew<Esc>')
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await shot(page, 't23-result-ch4-01')
+  await shotResult(page, 't23-result-ch4-01')
   ok('T13 ch4-01 三轮连击通关')
 
   // —— T13b ch4-02..07 三 rep 连续通关（N=3） ——
@@ -331,7 +336,7 @@ const run = async () => {
       .catch(() => false)
     cleared ? ok(`T13b ${id} 三 rep 通关`) : fail(`T13b ${id}`, '未出现结算屏')
   }
-  await shot(page, 't23b-result-ch4-grad')
+  await shotResult(page, 't23b-result-ch4-grad')
 
   // —— T14 ch5 解锁 + 白名单放开 + 选区高亮 + ch5-01 教学卡与 N=3 ——
   await page.getByRole('button', { name: '回到地图' }).click()
@@ -369,7 +374,7 @@ const run = async () => {
   await page.waitForTimeout(500)
   await press(page, 'v$d')
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await shot(page, 't27-result-ch5-01')
+  await shotResult(page, 't27-result-ch5-01')
   ok('T14 ch5-01 三轮连击通关')
 
   // —— T15 ch5-02..08 三 rep 连续通关（N=3；块选高亮在 05 存证） ——
@@ -410,7 +415,7 @@ const run = async () => {
       .catch(() => false)
     cleared ? ok(`T15 ${id} 三 rep 通关`) : fail(`T15 ${id}`, '未出现结算屏')
   }
-  await shot(page, 't29-result-ch5-grad')
+  await shotResult(page, 't29-result-ch5-grad')
 
   // —— T16 ch6 解锁 + 搜索/替换全链路（N=3；cmdline 栏存证） ——
   await page.getByRole('button', { name: '回到地图' }).click()
@@ -445,7 +450,7 @@ const run = async () => {
   await page.waitForTimeout(500)
   await press(page, '/todo<CR>dd')
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await shot(page, 't33-result-ch6-01')
+  await shotResult(page, 't33-result-ch6-01')
   ok('T16 ch6-01 三轮连击通关')
 
   // —— T17 ch6-02..08 三 rep 连续通关（N=3；:s 命令行在 05 存证） ——
@@ -486,7 +491,7 @@ const run = async () => {
       .catch(() => false)
     cleared ? ok(`T17 ${id} 三 rep 通关`) : fail(`T17 ${id}`, '未出现结算屏')
   }
-  await shot(page, 't35-result-ch6-grad')
+  await shotResult(page, 't35-result-ch6-grad')
 
   // —— T17 ch7 解锁 + 综合实战全链路（N=3；无新命令故无教学卡） ——
   await page.getByRole('button', { name: '回到地图' }).click()
@@ -513,8 +518,7 @@ const run = async () => {
   await page.waitForTimeout(500)
   await press(page, ':%s/user/data/g<CR>')
   await page.waitForSelector('.ticket', { timeout: 3000 })
-  await page.waitForTimeout(950) // 星级/效率条入场动画约 540ms，等满再取证
-  await shot(page, 't38-result-ch7-01')
+  await shotResult(page, 't38-result-ch7-01')
   ok('T17 ch7-01 三轮连击通关')
 
   // —— T18 ch7-02..08 三 rep 连续通关（N=3；C-v 块选高亮在 05 存证） ——
@@ -555,9 +559,8 @@ const run = async () => {
       .catch(() => false)
     cleared ? ok(`T18 ${id} 三 rep 通关`) : fail(`T18 ${id}`, '未出现结算屏')
   }
-  await shot(page, 't40-result-ch7-grad')
-  await page.waitForTimeout(950) // 同 t38：等满入场动画再补帧
-  await shot(page, 't40b-result-ch7-grad-final')
+  await shotResult(page, 't40-result-ch7-grad')
+  await shotResult(page, 't40b-result-ch7-grad-final')
   await page.getByRole('button', { name: '回到地图' }).click()
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
