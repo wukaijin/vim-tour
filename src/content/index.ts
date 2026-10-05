@@ -21,6 +21,7 @@ export const CHAPTERS: ChapterMeta[] = [
   { id: 4, title: '文本对象', subtitle: 'iw aw · i( i" · it ip', color: RAMP[3], inkBorder: true },
   { id: 5, title: 'Visual 模式', subtitle: 'v V C-v · 缩进 · 块插入', color: RAMP[4], inkBorder: false },
   { id: 6, title: '查找替换', subtitle: '/ ? n N * # · :s', color: RAMP[5], inkBorder: false },
+  { id: 7, title: '综合实战', subtitle: '真实场景 · 全技能综合', color: RAMP[6], inkBorder: false },
 ]
 
 export function chapterMeta(id: number): ChapterMeta | undefined {
