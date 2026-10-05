@@ -38,6 +38,7 @@ const view = computed(() => {
     cmdline: r.engine.cmdline?.text ?? '',
     message: r.engine.message,
     selection: r.mode.startsWith('visual') ? r.engine.selectionRange() : null,
+    phantoms: r.mode === 'insert' ? (r.engine.blockInsertPending() ?? []) : [],
   }
 })
 const level = computed(() => game.activeLevel)
@@ -196,6 +197,7 @@ onBeforeUnmount(() => {
         :mode="mode"
         :grid="level.grid !== false"
         :selection="view?.selection ?? null"
+        :phantoms="view?.phantoms ?? []"
       />
       <TargetDiff
         class="pane"

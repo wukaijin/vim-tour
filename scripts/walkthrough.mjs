@@ -404,8 +404,21 @@ const run = async () => {
       await press(page, '<Esc>gg')
       await page.waitForTimeout(150)
     }
-    await press(page, par)
-    await page.waitForTimeout(500)
+    if (id === 'ch5-06') {
+      // 块插入虚显存证：第一轮 rep 拆开，Esc 前停住——二三行应实时虚显已键的「# 」
+      await press(page, '<C-v>jjI# ')
+      await page.waitForTimeout(250)
+      await shot(page, 't28b-block-insert-pending')
+      const phSegs = await page.locator('.buffer .seg.phantom').count()
+      phSegs >= 2
+        ? ok(`T15 ch5-06 块插入虚显（其余行 ${phSegs} 段）`)
+        : fail('T15 ch5-06 块插入虚显', `phantom 段数 ${phSegs}`)
+      await press(page, '<Esc>')
+      await page.waitForTimeout(500)
+    } else {
+      await press(page, par)
+      await page.waitForTimeout(500)
+    }
     await press(page, par)
     await page.waitForTimeout(500)
     await press(page, par)

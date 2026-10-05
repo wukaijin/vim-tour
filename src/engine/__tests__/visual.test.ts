@@ -73,4 +73,24 @@ describe('visual block（C-v）', () => {
   it('A 跳过太短的行', () => {
     expect(run(['abc', 'c'], '<C-v>ljA!<Esc>').lines).toEqual(['ab!c', 'c'])
   })
+
+  it('块插入虚显：pending 期间暴露其余行应叠加的已键文本', () => {
+    const e = run(COLS, '<C-v>jjI# ').engine
+    expect(e.blockInsertPending()).toEqual([
+      { line: 1, col: 0, text: '# ' },
+      { line: 2, col: 0, text: '# ' },
+    ])
+    e.pressAll('<Esc>')
+    expect(e.blockInsertPending()).toBeNull()
+    expect(e.lines).toEqual(['# abc', '# defg', '# hi'])
+  })
+
+  it('块插入虚显：刚进入尚未键入时为 null', () => {
+    expect(run(COLS, '<C-v>jjI').engine.blockInsertPending()).toBeNull()
+  })
+
+  it('块插入虚显：行不满足套用条件则不虚显（与 Esc 套用判定一致）', () => {
+    expect(run(['abc', 'c'], '<C-v>ljA!').engine.blockInsertPending()).toEqual([])
+    expect(run(COLS, '<C-v>jjlcX').engine.blockInsertPending()).toEqual([{ line: 1, col: 0, text: 'X' }])
+  })
 })

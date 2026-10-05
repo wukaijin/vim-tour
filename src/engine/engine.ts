@@ -21,6 +21,10 @@ interface BlockCtx {
 
 const ok = (changed = false, message?: string): PressResult => ({ handled: true, changed, message })
 
+/** 块插入可生效行：A 需行长 > col-1，c/I 需行长 > col */
+const blockLineOk = (line: string, ctx: BlockCtx): boolean =>
+  ctx.mode === 'A' ? line.length > ctx.col - 1 : line.length > ctx.col
+
 const cmp = (a: Cursor, b: Cursor) => a.line - b.line || a.col - b.col
 const minC = (a: Cursor, b: Cursor) => (cmp(a, b) <= 0 ? a : b)
 const maxC = (a: Cursor, b: Cursor) => (cmp(a, b) >= 0 ? a : b)
@@ -997,6 +1001,22 @@ export class VimEngine {
     return i
   }
 
+  /** 块插入会话的虚显（真实 vim 输入中会把已键文本实时显示在块内各行）：
+   *  返回其余各行应在 col 处叠加显示的已键文本；非块插入或尚未键入 → null */
+  blockInsertPending(): { line: number; col: number; text: string }[] | null {
+    const ctx = this.blockCtx
+    if (!ctx) return null
+    const first = this.lines[ctx.firstLine] ?? ''
+    const delta = first.length - ctx.origLen
+    if (delta <= 0) return null
+    const typed = first.slice(ctx.col, ctx.col + delta)
+    const spans: { line: number; col: number; text: string }[] = []
+    for (let l = ctx.firstLine + 1; l <= ctx.lastLine; l++) {
+      if (blockLineOk(this.lines[l] ?? '', ctx)) spans.push({ line: l, col: ctx.col, text: typed })
+    }
+    return spans
+  }
+
   /** 块插入会话结束：把首行键入的文本套到其余行。返回是否处于块插入 */
   private finishBlockInsert(): boolean {
     const ctx = this.blockCtx
@@ -1009,8 +1029,7 @@ export class VimEngine {
     const next = [...this.lines]
     for (let l = ctx.firstLine + 1; l <= ctx.lastLine; l++) {
       const line = next[l] ?? ''
-      const okLine = ctx.mode === 'A' ? line.length > ctx.col - 1 : line.length > ctx.col
-      if (!okLine) continue
+      if (!blockLineOk(line, ctx)) continue
       next[l] = line.slice(0, ctx.col) + typed + line.slice(ctx.col)
     }
     this.setLines(next)

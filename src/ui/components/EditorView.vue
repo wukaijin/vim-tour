@@ -6,6 +6,8 @@ import type { Cursor, Mode } from '../../engine'
  * 纸面编辑器（PLAN §8.4）：亮底、1px edge 描边、硬阴影、弱化行号槽。
  * 光标是全屏最亮元素：normal=实心块、insert=竖线；闪烁尊重 reduced-motion。
  * visual 模式下选区以 brand 浅底高亮（char=行内段 / line=整行 / block=列段，短行截断）。
+ * 块插入 pending 期间以 phantoms 虚显：其余行在块缘处实时叠加已键文本
+ * （真实 vim 同观感，Esc 后由引擎套用转正）。
  */
 interface VisualSelection {
   start: Cursor
@@ -13,9 +15,17 @@ interface VisualSelection {
   kind: 'char' | 'line' | 'block'
 }
 
+/** 虚显段：该行 col 处叠加显示 text（引擎 blockInsertPending 的输出） */
+interface Phantom {
+  line: number
+  col: number
+  text: string
+}
+
 interface Seg {
   text: string
   sel: boolean
+  phantom?: boolean
 }
 
 const props = withDefaults(
@@ -25,8 +35,9 @@ const props = withDefaults(
     mode: Mode
     grid?: boolean
     selection?: VisualSelection | null
+    phantoms?: Phantom[]
   }>(),
-  { grid: true, selection: null },
+  { grid: true, selection: null, phantoms: () => [] },
 )
 
 /** 本行选区列区间 [a, b)；行不在选区内或区间为空 → null */
@@ -43,23 +54,27 @@ function selSpan(line: number, text: string): [number, number] | null {
   return a < b ? [a, b] : null
 }
 
-/** 把文本按选区拆成段（无选区时整行一段） */
-function segments(text: string, line: number): Seg[] {
-  const span = selSpan(line, text)
+/** 把文本按标记区间拆成段（无标记时整行一段） */
+function segments(text: string, line: number, ph: [number, number] | null): Seg[] {
+  // sel 与 phantom 互斥：虚显仅存在于块插入 pending，彼时已无选区
+  const span = selSpan(line, text) ?? ph
   if (!span) return [{ text, sel: false }]
   const [a, b] = span
   const segs: Seg[] = []
   if (a > 0) segs.push({ text: text.slice(0, a), sel: false })
-  segs.push({ text: text.slice(a, b), sel: true })
+  segs.push({ text: text.slice(a, b), sel: false, phantom: ph !== null })
   if (b < text.length) segs.push({ text: text.slice(b), sel: false })
   return segs
 }
 
 const rows = computed(() =>
   props.lines.map((text, line) => {
+    const ph = props.phantoms.find(p => p.line === line)
+    const display = ph ? text.slice(0, ph.col) + ph.text + text.slice(ph.col) : text
+    const phSpan: [number, number] | null = ph ? [ph.col, ph.col + ph.text.length] : null
     const isCursorLine = line === props.cursor.line
     const col = isCursorLine ? props.cursor.col : -1
-    const full = segments(text, line)
+    const full = segments(display, line, phSpan)
     let before = full
     let after: Seg[] = []
     if (isCursorLine) {
@@ -82,7 +97,7 @@ const rows = computed(() =>
     }
     return {
       before,
-      at: isCursorLine ? (text[col] ?? ' ') : null,
+      at: isCursorLine ? (display[col] ?? ' ') : null,
       after,
       isCursorLine,
     }
@@ -108,14 +123,14 @@ const modeLabel: Record<Mode, string> = {
       <div v-for="(row, i) in rows" :key="i" class="line" :class="{ active: row.isCursorLine }">
         <span class="gutter">{{ i + 1 }}</span>
         <span class="text"
-          ><span v-for="(s, k) in row.before" :key="'b' + k" class="seg" :class="{ sel: s.sel }">{{ s.text }}</span
+          ><span v-for="(s, k) in row.before" :key="'b' + k" class="seg" :class="{ sel: s.sel, phantom: s.phantom }">{{ s.text }}</span
           ><span
             v-if="row.at !== null"
             class="cursor"
             :class="mode === 'insert' ? 'bar' : 'block'"
             :data-ch="row.at"
           ></span
-          ><span v-for="(s, k) in row.after" :key="'a' + k" class="seg" :class="{ sel: s.sel }">{{ s.text }}</span></span
+          ><span v-for="(s, k) in row.after" :key="'a' + k" class="seg" :class="{ sel: s.sel, phantom: s.phantom }">{{ s.text }}</span></span
         >
       </div>
     </div>
@@ -203,8 +218,10 @@ const modeLabel: Record<Mode, string> = {
 }
 
 /* visual 选区高亮：真实 vim 为反白；键帽母题下用 brand 浅底，
-   但要压得住纸面白——24% 混色在 #FFFDF8 上几乎读不出边界 */
-.seg.sel {
+   但要压得住纸面白——24% 混色在 #FFFDF8 上几乎读不出边界。
+   块插入虚显同观感（vim 中虚显文本也是反白） */
+.seg.sel,
+.seg.phantom {
   background: color-mix(in srgb, var(--brand) 45%, var(--surface));
   border-radius: 3px;
 }
