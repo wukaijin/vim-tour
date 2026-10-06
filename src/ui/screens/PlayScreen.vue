@@ -165,6 +165,18 @@ onBeforeUnmount(() => {
             <span class="label">教学卡</span>
           </span>
         </button>
+        <!-- C-w 虚拟键帽：Chrome/Edge 把 Ctrl+W 列为保留键（关标签页，页面拦不住），
+             键盘直通只在 Firefox 等有效，这里是唯一稳定入口。仅插入态可按（灰面=还没轮到它） -->
+        <button
+          class="tool cw"
+          :disabled="mode !== 'insert'"
+          @click="game.feed('<C-w>'); reclaimFocus()"
+        >
+          <span class="face">
+            <span class="key mono">C-w</span>
+            <span class="label">删词</span>
+          </span>
+        </button>
       </div>
       <div class="tool-right">
         <div v-if="game.warmup" class="warmup-chip">
@@ -398,6 +410,25 @@ onBeforeUnmount(() => {
 .tool:disabled .cost {
   border-color: #ded8c9;
   color: #a49e91;
+}
+
+/* 虚拟键帽的键名牌：等宽小牌承载 C-w 字样（与 .cost 同构、换中性配色） */
+.tool .key {
+  flex: none;
+  margin-left: 0;
+  padding: 1px 6px 2px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 10%, var(--surface));
+  border: 1px solid var(--tk-edge);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.tool:disabled .key {
+  border-color: #ded8c9;
+  background: transparent;
 }
 
 /* 紧凑档：热身条里的「跳过热身」 */

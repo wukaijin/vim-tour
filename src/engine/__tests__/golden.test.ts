@@ -26,6 +26,53 @@ describe('ch1 生存：i a o O x dd yy p u', () => {
     expect(noop.cursor).toEqual({ line: 0, col: 0 })
   })
 
+  it('插入模式 <Del>：行中删光标处字符、光标不动；行尾退化删前一个', () => {
+    // lli → c 前插入，Del 删 c（光标处的字符，不是光标前的）
+    const mid = run(['abcd'], 'lli<Del>')
+    expect(mid.lines).toEqual(['abd'])
+    expect(mid.cursor).toEqual({ line: 0, col: 2 })
+    // A → 行尾，光标处无字符，退化 <BS> 删前一个
+    const eol = run(['abc'], 'A<Del>')
+    expect(eol.lines).toEqual(['ab'])
+    expect(eol.cursor).toEqual({ line: 0, col: 2 })
+  })
+
+  it('插入模式行尾 <BS>：光标不错位、删到空行不为负（setLines clamp 存量 bug 回归）', () => {
+    // 回归：旧实现在 setLines（按 normal 语义 clamp 到 len-1）之后才做 col-1，
+    // 行尾退格光标错位，删到空行时甚至得到 -1
+    const r = run(['abc'], 'A<BS>')
+    expect(r.lines).toEqual(['ab'])
+    expect(r.cursor).toEqual({ line: 0, col: 2 })
+    const drain = run(['ab'], 'A<BS><BS>')
+    expect(drain.lines).toEqual([''])
+    expect(drain.cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it('插入模式 <C-w>：先吃紧邻空白再删一个词，词前分隔空格保留（对齐 vim ins_bs）', () => {
+    // vim 语义（edit.c ins_bs BACKSPACE_WORD）：'foo bar' 行尾 C-w → 'foo '
+    const r = run(['foo bar'], 'A<C-w>')
+    expect(r.lines).toEqual(['foo '])
+    expect(r.cursor).toEqual({ line: 0, col: 4 })
+    // 词后新键入的空白与词一并删净，仍留一个分隔空格
+    expect(run(['foo bar'], 'A  <C-w>').lines).toEqual(['foo '])
+    // !! 是标点组，bar 是 word 组，各删各的
+    expect(run(['foo!!bar'], 'A<C-w>').lines).toEqual(['foo!!'])
+    expect(run(['foo!!bar'], 'A<C-w><C-w>').lines).toEqual(['foo'])
+    // 行首：到行首即止，不合并上一行（与 <BS> 不同）
+    const noop = run(['foo', 'bar'], 'ji<C-w>')
+    expect(noop.lines).toEqual(['foo', 'bar'])
+    expect(noop.cursor).toEqual({ line: 1, col: 0 })
+  })
+
+  it('块插入会话：<BS> 不跨行合并、<CR> 不拆行（blockCtx 行号不失位）', () => {
+    // j 先把光标放到 a 行再块选 a:b；回归：修复前行首 <BS> 会把首行并入上一行、
+    // 后续行号整体上移，Esc 套用落空
+    const bs = run(['x', 'a', 'b'], 'j<C-v>jI<BS>Z<Esc>')
+    expect(bs.lines).toEqual(['x', 'Za', 'Zb'])
+    const cr = run(['x', 'a', 'b'], 'j<C-v>jI<CR>Z<Esc>')
+    expect(cr.lines).toEqual(['x', 'Za', 'Zb'])
+  })
+
   it('A 行尾追加 / I 行首插入', () => {
     expect(run(TEXT, 'A;').lines[0]).toBe('foo bar baz;')
     expect(run(['  ind', 'x'], 'I-<Esc>').lines[0]).toBe('  -ind')

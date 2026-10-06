@@ -45,7 +45,7 @@ export const isDigit = (k: Key) => k >= '1' && k <= '9'
 export const isDigit0 = (k: Key) => k >= '0' && k <= '9'
 
 /** 已知命名键；其余 `<`（如搜索 pattern 里的 `\<`）按普通字符处理 */
-const NAMED_KEY = /^<(?:Esc|CR|BS|C-[a-z])>$/
+const NAMED_KEY = /^<(?:Esc|CR|BS|Del|Tab|C-[a-z])>$/
 
 /** 把 "2d3w<Esc>" 这类序列切成 Key[] */
 export function parseKeys(seq: string): Key[] {

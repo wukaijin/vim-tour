@@ -100,13 +100,22 @@ export class LevelRun {
 
   /**
    * 白名单只作用于 normal/visual 命令层（PLAN §2.5——教学进度管的是命令，不是打字）；
-   * insert / cmdline 是文本输入态：可打印字符与基本编辑键直接放行；
+   * insert / cmdline 是文本输入态：可打印字符与基本编辑键直接放行
+   * （<C-w> 删词与 <Del> 属基本编辑键，ch3 起入命令表，见 commands.ts insdelword）；
    * 未配置白名单（ch5+）时命令层也全放行。
    */
   private passesFilter(key: Key): boolean {
     const m = this.engine.mode
     if (m === 'insert') {
-      return key.length === 1 || key === '<Esc>' || key === '<BS>' || key === '<CR>' || key === '<Tab>'
+      return (
+        key.length === 1 ||
+        key === '<Esc>' ||
+        key === '<BS>' ||
+        key === '<CR>' ||
+        key === '<Tab>' ||
+        key === '<C-w>' ||
+        key === '<Del>'
+      )
     }
     if (m === 'cmdline') {
       return key.length === 1 || key === '<Esc>' || key === '<BS>' || key === '<CR>'

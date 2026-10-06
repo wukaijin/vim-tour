@@ -1116,6 +1116,9 @@ export class VimEngine {
     }
     const line = this.lines[this.cursor.line]
     if (key === '<CR>') {
+      // 块插入会话不拆行：拆行会让 blockCtx 记录的行号整体错位、退出时套用落空。
+      // 块插入教的是多行前缀/后缀（ch5），行内换行属误操作场景，简化为无操作。
+      if (this.blockCtx) return ok(true)
       const next = [...this.lines]
       next.splice(this.cursor.line, 1, line.slice(0, this.cursor.col), line.slice(this.cursor.col))
       this.setLines(next)
@@ -1123,20 +1126,20 @@ export class VimEngine {
       return ok(true)
     }
     if (key === '<BS>') {
-      if (this.cursor.col > 0) {
+      this.insertBackspace()
+      return ok(true)
+    }
+    if (key === '<Del>') {
+      if (this.cursor.col < line.length) {
+        // 行中：删光标处字符（i_<Del> 本职），光标不动（坐标先算好，防 setLines 的 clamp 错移）
+        const col = this.cursor.col
         const next = [...this.lines]
-        next[this.cursor.line] = line.slice(0, this.cursor.col - 1) + line.slice(this.cursor.col)
+        next[this.cursor.line] = line.slice(0, col) + line.slice(col + 1)
         this.setLines(next)
-        this.cursor = { ...this.cursor, col: this.cursor.col - 1 }
-      } else if (this.cursor.line > 0) {
-        const prev = this.lines[this.cursor.line - 1]
-        const next = [...this.lines]
-        next.splice(this.cursor.line - 1, 2, prev + line)
-        // 接缝坐标要在 setLines 之前算：setLines 内会 clamp 光标，之后取 this.cursor.line - 1 会得到 -1
-        const joinedLine = this.cursor.line - 1
-        const joinedCol = prev.length
-        this.setLines(next)
-        this.cursor = { line: joinedLine, col: joinedCol }
+        this.cursor = { line: this.cursor.line, col }
+      } else {
+        // 行尾退化为 <BS> 语义（删前一个）：与真实 vim 'backspace' 不含 eol 时一致
+        this.insertBackspace()
       }
       return ok(true)
     }
@@ -1165,6 +1168,31 @@ export class VimEngine {
       return ok(true)
     }
     return { handled: false }
+  }
+
+  /** 插入模式退格：行内删前一个字符；行首与上一行合并（光标落接缝）。
+   *  新坐标一律在 setLines 之前算好、之后显式赋回——setLines 内按 normal 语义
+   *  clamp 到 len-1，会把 insert 允许的行尾虚拟位（col==len）吃掉（行尾退格
+   *  光标错位、删到空行时甚至得 -1 的存量 bug 同族）。
+   *  块插入会话不做跨行合并——合并会让 blockCtx 记录的行号整体上移错位，
+   *  退出时「首行文本套用到其余行」会落空（此为教学简化的有意决策）。 */
+  private insertBackspace(): void {
+    const line = this.lines[this.cursor.line]
+    if (this.cursor.col > 0) {
+      const col = this.cursor.col - 1
+      const next = [...this.lines]
+      next[this.cursor.line] = line.slice(0, col) + line.slice(this.cursor.col)
+      this.setLines(next)
+      this.cursor = { line: this.cursor.line, col }
+    } else if (this.cursor.line > 0 && !this.blockCtx) {
+      const prev = this.lines[this.cursor.line - 1]
+      const next = [...this.lines]
+      next.splice(this.cursor.line - 1, 2, prev + line)
+      const joinedLine = this.cursor.line - 1
+      const joinedCol = prev.length
+      this.setLines(next)
+      this.cursor = { line: joinedLine, col: joinedCol }
+    }
   }
 
   private wordStartBefore(line: string, col: number): number {

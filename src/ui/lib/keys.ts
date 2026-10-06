@@ -13,13 +13,16 @@ export interface KeyEventLike {
  * 键盘事件 → 引擎 Key token。
  * 可打印单字符直通；命名键映射为尖括号形式；方向键刻意忽略（vim 用 hjkl）；
  * IME 组合期间不产生按键。
- * Ctrl 组合只放行 <C-r>（重做）与 <C-v>（块可视化，ch5 起）——其余组合键忽略。
+ * Ctrl 组合放行 <C-r>（重做）、<C-v>（块可视化，ch5 起）与 <C-w>（插入模式删词，ch3 入表）。
+ * 注：Chrome/Edge 把 Ctrl+W 列为浏览器保留键（关标签页，事件不达页面），
+ * 放行只在能收到该事件的浏览器（如 Firefox）生效；Chrome 玩家走对局屏虚拟键帽。
  */
 export function eventToKey(e: KeyEventLike): Key | null {
   if (e.isComposing) return null
   if (e.ctrlKey || e.metaKey || e.altKey) {
     if (e.key === 'r' && (e.ctrlKey || e.metaKey)) return '<C-r>'
     if (e.key === 'v' && e.ctrlKey && !e.metaKey && !e.altKey) return '<C-v>'
+    if (e.key === 'w' && e.ctrlKey && !e.metaKey && !e.altKey) return '<C-w>'
     return null
   }
   switch (e.key) {
@@ -27,6 +30,8 @@ export function eventToKey(e: KeyEventLike): Key | null {
       return '<CR>'
     case 'Backspace':
       return '<BS>'
+    case 'Delete':
+      return '<Del>'
     case 'Tab':
       return '<Tab>'
     case 'Escape':
