@@ -26,7 +26,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - uses: actions/configure-pages@v5
+      # 注：不用 actions/configure-pages——它在 Pages 未启用时的自动开通调用会被拒，
+      # 且 base 为 './' 不依赖它注入 base_path。首次部署前需在仓库
+      # Settings → Pages → Build and deployment → Source 手动选一次 "GitHub Actions"。
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
