@@ -8,9 +8,12 @@ import { keysOf } from '../commands'
  */
 const CH123 = [
   'esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq',
+  'replace', 'redo', 'appendEol',
   'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G',
   'f', 'F', 't', 'T', 'semicolon', 'comma',
+  'matchparen', 'para',
   'd', 'c', 'y', 'J', 'count', 'dot',
+  'putBefore', 'eolops', 'chgenter', 'insdelword',
 ] as const
 
 /** 本章已教文本对象（逐关累积） */
@@ -190,7 +193,7 @@ const chapter4: Level[] = [
       '完整解：c i { new <Esc> j f [ c i [ <Esc>（花括号内容换成 new；下方方括号清空）。',
     ],
     allowedKeys: keysOf([
-      ...CH123, 'replace', 'redo', 'appendEol', 'matchparen', 'para', 'putBefore', 'eolops', 'chgenter', 'insdelword',
+      ...CH123,
       ...OBJ[6], 'ibrace', 'ibrack',
     ]),
     teaches: ['ibrace', 'ibrack'],
@@ -218,7 +221,7 @@ const chapter4: Level[] = [
       '组合第 1–4 章：dd 删行、ciw 改词、ci" 改字符串、J 并行、f" 定位引号。',
       '完整解：d d w c i w new <Esc> J f " c i " z <Esc>。',
     ],
-    allowedKeys: keysOf([...CH123, ...OBJ[6]]),
+    allowedKeys: keysOf([...CH123, ...OBJ[6], 'ibrace', 'ibrack']),
     teaches: [],
     graduation: true,
     texts: [

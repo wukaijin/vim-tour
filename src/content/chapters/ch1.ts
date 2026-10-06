@@ -159,7 +159,7 @@ const chapter1: Level[] = [
       '这关没有新命令——把本章学的组合起来：a 插入、dd 删行、yy+p 复制行。',
       '完整解：a space l i s t <Esc> j j dd yy p（补标题，删 fold，复制 call mom）。',
     ],
-    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq']),
+    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol']),
     teaches: [],
     graduation: true,
     texts: [

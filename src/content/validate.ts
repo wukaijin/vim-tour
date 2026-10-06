@@ -1,10 +1,12 @@
 import { parseKeys } from '../engine'
 import { LevelRun, sameLines } from '../game/runtime'
 import type { Level } from '../game/types'
-import { isTaughtSeq } from './commands'
+import { COMMANDS, commandById, isTaughtSeq, seqsOf } from './commands'
 
 /** PLAN §9.3①：栅格关禁 CJK 的码位区间 */
 const CJK_RE = /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/
+
+const KNOWN_IDS = new Set(COMMANDS.map((c) => c.id))
 
 export type ValidationRule =
   | 'cjk-grid'
@@ -35,6 +37,8 @@ function leadingWhitespace(line: string): string {
 export function validateLevels(levels: Level[]): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const seenIds = new Set<string>()
+  /** 教学累积（含往章与本章此前各关的 teaches；入参须为教学顺序，即 loadAllLevels 的排序） */
+  const taught = new Set<string>()
 
   for (const level of levels) {
     const push = (rule: ValidationRule, message: string) =>
@@ -64,6 +68,24 @@ export function validateLevels(levels: Level[]): ValidationIssue[] {
     } else if (level.allowedKeys) {
       push('allowed-keys', `第 ${level.chapter} 章起白名单完全放开，不得配置 allowedKeys（PLAN §2.5）`)
     }
+
+    // teaches 的命令 id 必须在 COMMANDS 表中（否则下方累积展开无法进行）
+    const unknownIds = (level.teaches ?? []).filter((id) => !KNOWN_IDS.has(id))
+    if (unknownIds.length > 0) {
+      push('shape', `teaches 含未知命令 id：${unknownIds.map((id) => JSON.stringify(id)).join(' ')}`)
+    }
+
+    // ④b 教学累积 ⊆ 白名单（§2.5 的另一半）：④ 只拦「超前教」，这里拦「教完漏给」——
+    // 教过的键在后续关卡按不出，等于把学会的收走（渐进解锁的口径是累积，不是每关重置）
+    if (level.chapter <= 4 && level.allowedKeys) {
+      const cumulative = [...taught].filter((id) => KNOWN_IDS.has(id))
+      const expected = new Set(cumulative.flatMap((id) => seqsOf(commandById(id))))
+      const missing = [...expected].filter((k) => !level.allowedKeys!.includes(k))
+      if (missing.length > 0) {
+        push('allowed-keys', `白名单漏了已教序列：${missing.map((k) => JSON.stringify(k)).join(' ')}（此前各关教学累积，教过的键不许收走）`)
+      }
+    }
+    for (const id of level.teaches ?? []) taught.add(id)
 
     for (let v = 0; v < level.texts.length; v++) {
       const t = level.texts[v]!

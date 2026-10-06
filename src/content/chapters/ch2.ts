@@ -16,7 +16,7 @@ const chapter2: Level[] = [
       'w 跳到下一个词的开头，b 往回跳；x 删光标处字符。',
       '完整解：x w x w x（删一个，跳一个词，再删）。',
     ],
-    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'w', 'b']),
+    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b']),
     teaches: ['w', 'b'],
     texts: [
       {
@@ -42,7 +42,7 @@ const chapter2: Level[] = [
       'e 跳到当前词的末字符，配合 a 正好在词尾补字。',
       '完整解：w e a s <Esc> w w w e a s <Esc>（跳到词、到词尾、补 s）。',
     ],
-    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'w', 'b', 'e']),
+    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b', 'e']),
     teaches: ['e'],
     texts: [
       {
@@ -68,7 +68,7 @@ const chapter2: Level[] = [
       '^ 跳到本行第一个非空白字符，$ 跳到行尾；x 删掉行尾的分号。',
       '完整解：^ i - space <Esc> $ x j x（$ 设过的行尾列会黏住：j 落在分号上，直接 x 删掉）。',
     ],
-    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'w', 'b', 'e', 'zero', 'caret', 'dollar']),
+    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b', 'e', 'zero', 'caret', 'dollar']),
     teaches: ['zero', 'caret', 'dollar'],
     texts: [
       {
@@ -95,7 +95,7 @@ const chapter2: Level[] = [
       '完整解：4gg yy G p 2gg dd（跳第 4 行复制，去末尾粘贴，跳第 2 行删除）。',
     ],
     allowedKeys: [
-      ...keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G']),
+      ...keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G']),
       '2gg',
       '3gg',
       '4gg',
@@ -126,7 +126,7 @@ const chapter2: Level[] = [
       'f{char} 在本行向右查找字符并跳过去；; 重复上一次查找。',
       '完整解：f x x ; x ; x（找到删掉，再找下一个）。',
     ],
-    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G', 'f', 'F', 't', 'T', 'semicolon', 'comma']),
+    allowedKeys: keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G', 'f', 'F', 't', 'T', 'semicolon', 'comma']),
     teaches: ['f', 'F', 't', 'T', 'semicolon', 'comma'],
     texts: [
       {
@@ -153,7 +153,7 @@ const chapter2: Level[] = [
       '完整解：yy G p 2gg dd $ a ! <Esc>。',
     ],
     allowedKeys: [
-      ...keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G', 'f', 'F', 't', 'T', 'semicolon', 'comma']),
+      ...keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G', 'f', 'F', 't', 'T', 'semicolon', 'comma']),
       '2gg',
       '3gg',
       '4gg',
@@ -185,7 +185,7 @@ const chapter2: Level[] = [
       '完整解：% x } } x（跳到闭括号删掉，跳两段到末行删行首杠）。',
     ],
     allowedKeys: keysOf([
-      'esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq',
+      'esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol',
       'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G',
       'f', 'F', 't', 'T', 'semicolon', 'comma', 'matchparen', 'para',
     ]),
@@ -215,7 +215,7 @@ const chapter2: Level[] = [
       '完整解：0 x x f x x j $ a ; <Esc> j $ a ! <Esc>。',
     ],
     allowedKeys: [
-      ...keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G', 'f', 'F', 't', 'T', 'semicolon', 'comma']),
+      ...keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G', 'f', 'F', 't', 'T', 'semicolon', 'comma', 'matchparen', 'para']),
       '2gg',
       '3gg',
       '4gg',

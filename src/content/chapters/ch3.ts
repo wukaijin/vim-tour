@@ -8,8 +8,10 @@ import { keysOf } from '../commands'
  */
 const CH12 = [
   'esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq',
+  'replace', 'redo', 'appendEol',
   'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G',
   'f', 'F', 't', 'T', 'semicolon', 'comma',
+  'matchparen', 'para',
 ] as const
 
 const chapter3: Level[] = [
@@ -180,7 +182,6 @@ const chapter3: Level[] = [
     ],
     allowedKeys: keysOf([
       ...CH12,
-      'replace', 'redo', 'appendEol',
       'd', 'c', 'y', 'J', 'count', 'dot',
       'putBefore', 'eolops', 'chgenter', 'insdelword',
     ]),
@@ -209,7 +210,7 @@ const chapter3: Level[] = [
       '组合第 1–3 章：dd 删行、cw 改词、J 并行。',
       '完整解：dd w cw new <Esc> j J。',
     ],
-    allowedKeys: keysOf([...CH12, 'd', 'c', 'y', 'J', 'count', 'dot']),
+    allowedKeys: keysOf([...CH12, 'd', 'c', 'y', 'J', 'count', 'dot', 'putBefore', 'eolops', 'chgenter', 'insdelword']),
     teaches: [],
     graduation: true,
     texts: [
