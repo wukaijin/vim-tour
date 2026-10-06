@@ -128,6 +128,29 @@ const chapter1: Level[] = [
     ],
   },
   {
+    id: 'ch1-06a',
+    chapter: 1,
+    title: '一键换字',
+    brief: 'vsn 两个字母打错了，行尾还漏了感叹号：r 原地换字不进插入模式，A 直接跳行尾补写。（u 撤多了？<C-r> 重做回来。）',
+    hints: [
+      'r{字符} 把光标处字符原地换掉，光标不动；A 跳到行尾进入插入模式。',
+      '完整解：l r i l r m A ! <Esc>（右移到 s，换成 i；再右移换 n 为 m，行尾补 !）。',
+    ],
+    allowedKeys: keysOf([
+      'esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq',
+      'replace', 'redo', 'appendEol',
+    ]),
+    teaches: ['replace', 'redo', 'appendEol'],
+    texts: [
+      {
+        start: ['vsn is fun'],
+        target: ['vim is fun!'],
+        cursor: { line: 0, col: 0 },
+        parKeys: 'lrilrmA!<Esc>',
+      },
+    ],
+  },
+  {
     id: 'ch1-07',
     chapter: 1,
     title: '第 1 章毕业考',

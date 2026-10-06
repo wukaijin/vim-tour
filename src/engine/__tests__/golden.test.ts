@@ -78,6 +78,73 @@ describe('ch1 生存：i a o O x dd yy p u', () => {
   })
 })
 
+describe('ch1 补充：r 单字符替换（含计数）', () => {
+  it('r 替换光标字符，光标停在替换后字符上', () => {
+    const r = run(TEXT, 'rz')
+    expect(r.lines[0]).toBe('zoo bar baz')
+    expect(r.cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it('3r- 替换 3 个字符，光标停最后一个；计数超行尾则替换到行尾为止', () => {
+    const r = run(['aaaa'], '3r-')
+    expect(r.lines[0]).toBe('---a')
+    expect(r.cursor).toEqual({ line: 0, col: 2 })
+    expect(run(['ab'], '9rX').lines[0]).toBe('XX')
+  })
+
+  it('r 后 <Esc> 取消；空行 r 无效', () => {
+    expect(run(TEXT, 'r<Esc>').lines).toEqual(TEXT)
+    expect(run([''], 'rx').lines).toEqual([''])
+  })
+
+  it('r 可撤销、可 . 重复（重放保留计数）', () => {
+    expect(run(['ab', 'cd'], 'rxu').lines[0]).toBe('ab')
+    expect(run(['a1', 'a2', 'a3'], 'rxj.j.').lines).toEqual(['x1', 'x2', 'x3'])
+  })
+})
+
+describe('ch2 补充：% 括号配对跳转与 { } 段落跳转', () => {
+  it('% 在括号上跳配对（跨行栈匹配）', () => {
+    const src = ['f(a', '  b)']
+    expect(run(src, '%', { line: 0, col: 1 }).cursor).toEqual({ line: 1, col: 3 })
+  })
+
+  it('% 不在括号上：行内向后找第一个括号再跳配对', () => {
+    expect(run(['see f(a)'], '%').cursor).toEqual({ line: 0, col: 7 })
+  })
+
+  it('% 反向：在闭括号上跳回；嵌套取配对；无括号行不动（简化）', () => {
+    const src = ['(a', '(b))']
+    expect(run(src, '%', { line: 1, col: 3 }).cursor).toEqual({ line: 0, col: 0 })
+    expect(run(src, '%', { line: 1, col: 0 }).cursor).toEqual({ line: 1, col: 2 })
+    expect(run(['no paren'], '%').cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it('d% 从光标删到配对括号（inclusive，光标不在括号上则从光标删起）', () => {
+    expect(run(['f(a)', 'tail'], 'd%').lines).toEqual(['', 'tail'])
+    expect(run(['see (a)', 'tail'], 'd%', { line: 0, col: 5 }).lines).toEqual(['see )', 'tail'])
+  })
+
+  it('} 跳到下一段首行；{ 段中跳本段首、段首跳上一段', () => {
+    const src = ['aa bb', 'cc', '', 'dd', '', 'ee']
+    expect(run(src, '}', { line: 0, col: 0 }).cursor).toEqual({ line: 3, col: 0 })
+    expect(run(src, '}', { line: 1, col: 1 }).cursor).toEqual({ line: 3, col: 0 })
+    expect(run(src, '{', { line: 1, col: 1 }).cursor).toEqual({ line: 0, col: 0 })
+    expect(run(src, '{', { line: 3, col: 0 }).cursor).toEqual({ line: 0, col: 0 })
+    expect(run(src, '{', { line: 4, col: 0 }).cursor).toEqual({ line: 3, col: 0 })
+  })
+
+  it('连续空行整体算段边界；} 无下段落最后一行行尾、{ 无上段落文件首', () => {
+    expect(run(['a', '', '', 'b'], '}', { line: 0, col: 0 }).cursor).toEqual({ line: 3, col: 0 })
+    expect(run(['aa', '', 'bb cc'], '}', { line: 2, col: 0 }).cursor).toEqual({ line: 2, col: 4 })
+    expect(run(['aa', '', 'bb'], '{', { line: 0, col: 1 }).cursor).toEqual({ line: 0, col: 0 })
+  })
+
+  it('d} 删到段尾（exclusive，吞掉中间空行）', () => {
+    expect(run(['keep', 'rm1 rm2', '', 'next'], 'd}').lines).toEqual(['next'])
+  })
+})
+
 describe('ch3 操作符 + 运动', () => {
   it('dw 删到下个词首', () => {
     expect(run(TEXT, 'dw').lines[0]).toBe('bar baz')

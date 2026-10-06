@@ -224,3 +224,84 @@ export function findChar(
   if (till) idx += -dir
   return idx
 }
+
+const OPEN = '([{'
+const CLOSE = ')]}'
+const closeOf = (ch: string) => CLOSE[OPEN.indexOf(ch)]
+const openOf = (ch: string) => OPEN[CLOSE.indexOf(ch)]
+
+/**
+ * % 括号配对跳转：光标处（或行内向后第一个）括号 → 跨行栈匹配配对位。
+ * 找不到或未闭合返回 null（简化：光标不动，不到行尾——与 find 家族 no-op 口径一致）。
+ */
+export function matchParen(lines: string[], cur: Cursor): MotionResult | null {
+  const line = lines[cur.line]
+  let start = -1
+  for (let c = cur.col; c < line.length; c++) {
+    if (OPEN.includes(line[c]!) || CLOSE.includes(line[c]!)) {
+      start = c
+      break
+    }
+  }
+  if (start < 0) return null
+  const ch = line[start]!
+  let depth = 0
+  if (OPEN.includes(ch)) {
+    for (let l = cur.line; l < lines.length; l++) {
+      for (let c = l === cur.line ? start : 0; c < lines[l].length; c++) {
+        const t = lines[l][c]!
+        if (t === ch) depth++
+        else if (t === closeOf(ch)) {
+          depth--
+          if (depth === 0) return { target: { line: l, col: c }, kind: 'inclusive' }
+        }
+      }
+    }
+  } else {
+    const open = openOf(ch) // 闭括号的开括号
+    for (let l = cur.line; l >= 0; l--) {
+      const from = l === cur.line ? start : lines[l].length - 1
+      for (let c = from; c >= 0; c--) {
+        const t = lines[l][c]!
+        if (t === ch) depth++
+        else if (t === open) {
+          depth--
+          if (depth === 0) return { target: { line: l, col: c }, kind: 'inclusive' }
+        }
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * 段落跳转（段落 = 空行分隔的连续非空行，与 textobjects 的 ip 同一定义）。
+ * }：下一段首行行首；无下一段 → 最后一个非空行的行尾字符。
+ * {：光标在段中/空行 → 本段首；在段首 → 上一段首；无上段 → 文件首行行首。
+ * 两者均为 exclusive（d} 吞掉本段与中间空行）。
+ */
+export function paraMotion(dir: 1 | -1, lines: string[], cur: Cursor): MotionResult {
+  if (dir === 1) {
+    let e = cur.line + 1
+    while (e < lines.length && lines[e] !== '') e++
+    if (e < lines.length) {
+      let t = e
+      while (t < lines.length && lines[t] === '') t++
+      if (t < lines.length) return { target: { line: t, col: 0 }, kind: 'exclusive' }
+    }
+    let nf = lines.length - 1
+    while (nf > 0 && lines[nf] === '') nf--
+    return { target: { line: nf, col: Math.max(0, lines[nf].length - 1) }, kind: 'exclusive' }
+  }
+  const atSegStart = cur.line === 0 || lines[cur.line - 1] === ''
+  if (atSegStart) {
+    let t = cur.line - 1
+    while (t >= 0 && lines[t] === '') t--
+    if (t < 0) return { target: { line: 0, col: 0 }, kind: 'exclusive' }
+    while (t > 0 && lines[t - 1] !== '') t--
+    return { target: { line: t, col: 0 }, kind: 'exclusive' }
+  }
+  let s = cur.line
+  while (s > 0 && lines[s - 1] !== '') s--
+  return { target: { line: s, col: 0 }, kind: 'exclusive' }
+}

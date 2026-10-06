@@ -55,7 +55,7 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 8000 })
   await page.waitForTimeout(600)
   const nodeCount = await page.locator('.node').count()
-  nodeCount === 52 ? ok('T1 地图渲染 52 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
+  nodeCount === 56 ? ok('T1 地图渲染 56 个节点') : fail('T1 地图渲染', `节点数 ${nodeCount}`)
   const currentCount = await page.locator('.node.current').count()
   currentCount === 1 && (await page.locator('.node.current .n-no').textContent()) === '1'
     ? ok('T1 ch1-01 为 current')
@@ -135,6 +135,8 @@ const run = async () => {
     'ch1-04': 'Ozero<Esc>josecond<Esc>',
     'ch1-05': 'ddkkyyjjp',
     'ch1-06': 'ostay foolish<Esc>',
+    'ch1-06a': 'lrilrmA!<Esc>',
+    'ch1-06a': 'lrilrmA!<Esc>',
     'ch1-07': 'a list<Esc>jjddyyp',
   }
   for (const [id, par] of Object.entries(pars)) {
@@ -168,7 +170,7 @@ const run = async () => {
   const locks = await page.locator('.ch-lock').count()
   locks === 5 ? ok('T7 ch2 已解锁，ch3–ch7 仍锁定') : fail('T7 章节锁', `ch-lock 数 ${locks}`)
   const doneAll = await page.locator('.node.done').count()
-  doneAll === 7 ? ok('T7 ch1 全部 7 关 done') : fail('T7 ch1 done 数', `${doneAll}`)
+  doneAll === 8 ? ok('T7 ch1 全部 8 关 done') : fail('T7 ch1 done 数', `${doneAll}`)
   await shot(page, 't11-map-ch2-unlocked')
 
   // —— T8 ch2-01：N=2 双 rep ——
@@ -213,6 +215,8 @@ const run = async () => {
     'ch2-04': '4ggyyGp2ggdd',
     'ch2-05': 'fxx;x;x',
     'ch2-06': 'yyGp2ggdd$a!<Esc>',
+    'ch2-06a': '%x}}x',
+    'ch2-06a': '%x}}x',
     'ch2-07': '0xxfxxj$a;<Esc>j$a!<Esc>',
   }
   for (const [id, par] of Object.entries(ch2Pars)) {
@@ -240,9 +244,9 @@ const run = async () => {
     for (const el of els) {
       const y = Math.round(el.offsetTop)
       if (top === null || y > top) {
-        const dot = el.querySelector('.dot')
-        // 必须判「可见」而非「存在」：修法是 display:none，querySelector 仍会命中
-        const dotVisible = !!dot && getComputedStyle(dot).display !== 'none'
+        // dot 挂在组块尾部（v2.1 结构）：行首组块的第一个子元素应是键帽而非 dot
+        const first = el.firstElementChild
+        const dotVisible = !!first && first.classList.contains('dot')
         out.push({ hasVisibleDot: dotVisible, y })
         top = y
       }
@@ -263,7 +267,7 @@ const run = async () => {
   const locks2 = await page.locator('.ch-lock').count()
   locks2 === 4 ? ok('T11 ch3 已解锁（ch4–ch7 仍锁定）') : fail('T11 ch3 解锁', `ch-lock 数 ${locks2}`)
   const doneAll2 = await page.locator('.node.done').count()
-  doneAll2 === 14 ? ok('T11 ch1+ch2 全部 14 关 done') : fail('T11 done 数', `${doneAll2}`)
+  doneAll2 === 16 ? ok('T11 ch1+ch2 全部 16 关 done') : fail('T11 done 数', `${doneAll2}`)
   await shot(page, 't16-map-ch3-unlocked')
 
   await page.locator('.node.current').click()
@@ -287,6 +291,8 @@ const run = async () => {
     'ch3-04': 'wyw$a <Esc>p',
     'ch3-05': 'Jj2dd',
     'ch3-06': 'd2w.',
+    'ch3-06a': 'f/Dj0Cnew<Esc>j0f/DyyP',
+    'ch3-06a': 'f/Dj0Cnew<Esc>j0f/DyyP',
     'ch3-07': 'ddwcwnew<Esc>jJ',
   }
   for (const [id, par] of Object.entries(ch3Pars)) {
@@ -316,7 +322,7 @@ const run = async () => {
   const locks3 = await page.locator('.ch-lock').count()
   locks3 === 3 ? ok('T13 ch4 已解锁（ch5–ch7 仍锁定）') : fail('T13 ch4 解锁', `ch-lock 数 ${locks3}`)
   const doneAll3 = await page.locator('.node.done').count()
-  doneAll3 === 21 ? ok('T13 ch1–ch3 全部 21 关 done') : fail('T13 done 数', `${doneAll3}`)
+  doneAll3 === 24 ? ok('T13 ch1–ch3 全部 24 关 done') : fail('T13 done 数', `${doneAll3}`)
   await shot(page, 't20-map-ch4-unlocked')
 
   await page.locator('.node.current').click()
@@ -345,6 +351,8 @@ const run = async () => {
     'ch4-04': 'di(jF(da(',
     'ch4-05': 'ci"new<Esc>jda"',
     'ch4-06': 'dit2jdip',
+    'ch4-06a': 'ci{new<Esc>jf[ci[<Esc>',
+    'ch4-06a': 'ci{new<Esc>jf[ci[<Esc>',
     'ch4-07': 'ddwciwnew<Esc>Jf"ci"z<Esc>',
   }
   for (const [id, par] of Object.entries(ch4Pars)) {
@@ -376,7 +384,7 @@ const run = async () => {
   const locks4 = await page.locator('.ch-lock').count()
   locks4 === 2 ? ok('T14 ch5 已解锁（ch6/ch7 仍锁定）') : fail('T14 ch5 解锁', `ch-lock 数 ${locks4}`)
   const doneAll4 = await page.locator('.node.done').count()
-  doneAll4 === 28 ? ok('T14 ch1–ch4 全部 28 关 done') : fail('T14 done 数', `${doneAll4}`)
+  doneAll4 === 32 ? ok('T14 ch1–ch4 全部 32 关 done') : fail('T14 done 数', `${doneAll4}`)
   await shot(page, 't24-map-ch5-unlocked')
 
   await page.locator('.node.current').click()
@@ -474,7 +482,7 @@ const run = async () => {
   const locks5 = await page.locator('.ch-lock').count()
   locks5 === 1 ? ok('T16 ch6 已解锁（ch7 仍锁定）') : fail('T16 ch6 解锁', `ch-lock 数 ${locks5}`)
   const doneAll5 = await page.locator('.node.done').count()
-  doneAll5 === 36 ? ok('T16 ch1–ch5 全部 36 关 done') : fail('T16 done 数', `${doneAll5}`)
+  doneAll5 === 40 ? ok('T16 ch1–ch5 全部 40 关 done') : fail('T16 done 数', `${doneAll5}`)
   await shot(page, 't30-map-ch6-unlocked')
 
   await page.locator('.node.current').click()
@@ -550,7 +558,7 @@ const run = async () => {
   const locks6 = await page.locator('.ch-lock').count()
   locks6 === 0 ? ok('T17 ch7 已解锁（最后一章，锁定提示消失）') : fail('T17 ch7 解锁', `ch-lock 数 ${locks6}`)
   const doneAll6 = await page.locator('.node.done').count()
-  doneAll6 === 44 ? ok('T17 ch1–ch6 全部 44 关 done') : fail('T17 done 数', `${doneAll6}`)
+  doneAll6 === 48 ? ok('T17 ch1–ch6 全部 48 关 done') : fail('T17 done 数', `${doneAll6}`)
   await shot(page, 't36-map-ch7-unlocked')
 
   await page.locator('.node.current').click()
@@ -615,7 +623,7 @@ const run = async () => {
   await page.waitForSelector('.chapter', { timeout: 3000 })
   await page.waitForTimeout(300)
   const doneAll7 = await page.locator('.node.done').count()
-  doneAll7 === 52 ? ok('T18 全书 52 关 done（ch7 通关）') : fail('T18 全书 done 数', `${doneAll7}`)
+  doneAll7 === 56 ? ok('T18 全书 56 关 done（ch7 通关）') : fail('T18 全书 done 数', `${doneAll7}`)
   await shot(page, 't41-map-all-done')
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
   await page.waitForTimeout(400)

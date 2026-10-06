@@ -170,6 +170,37 @@ const chapter3: Level[] = [
     ],
   },
   {
+    id: 'ch3-06a',
+    chapter: 3,
+    title: '快捷键三连',
+    brief: 'D 删到行尾、C 改到行尾、P 贴到上一行——d$、c$、行粘贴的高频合体键。（s/S 与插入模式 <C-w> 见教学卡。）',
+    hints: [
+      'D = d$ 删光标起到行尾；C = c$ 删到行尾直接开输；yyP 把整行贴到上一行。j 会带着列走，换行后按 0 回行首。',
+      '完整解：f / D j 0 C new <Esc> j 0 f / D y y P（两行删注释，中间行改写，复制末行贴上去）。',
+    ],
+    allowedKeys: keysOf([
+      ...CH12,
+      'replace', 'redo', 'appendEol',
+      'd', 'c', 'y', 'J', 'count', 'dot',
+      'putBefore', 'eolops', 'chgenter', 'insdelword',
+    ]),
+    teaches: ['putBefore', 'eolops', 'chgenter', 'insdelword'],
+    texts: [
+      {
+        start: ['keep me//junk', 'old aaa bbb', 'hold//junk'],
+        target: ['keep me', 'new', 'hold', 'hold'],
+        cursor: { line: 0, col: 0 },
+        parKeys: 'f/Dj0Cnew<Esc>j0f/DyyP',
+      },
+      {
+        start: ['stay ok//junk', 'old x y', 'keep//junk'],
+        target: ['stay ok', 'new', 'keep', 'keep'],
+        cursor: { line: 0, col: 0 },
+        parKeys: 'f/Dj0Cnew<Esc>j0f/DyyP',
+      },
+    ],
+  },
+  {
     id: 'ch3-07',
     chapter: 3,
     title: '第 3 章毕业考',

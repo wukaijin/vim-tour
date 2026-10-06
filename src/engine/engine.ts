@@ -44,6 +44,7 @@ export class VimEngine {
   private opCount: number | null = null
   private awaitingRegister = false
   private awaitingFind: 'f' | 'F' | 't' | 'T' | null = null
+  private awaitingReplace = false
   private awaitingObject: 'i' | 'a' | null = null
   private awaitingG = false
   private lastFind: { dir: 1 | -1; till: boolean; ch: string } | null = null
@@ -113,6 +114,7 @@ export class VimEngine {
       this.desiredCol,
       this.awaitingRegister ? 1 : 0,
       this.awaitingFind,
+      this.awaitingReplace ? 1 : 0,
       this.awaitingObject,
       this.awaitingG ? 1 : 0,
       this.lastFind ? `${this.lastFind.dir}\u0001${this.lastFind.till ? 1 : 0}\u0001${this.lastFind.ch}` : null,
@@ -149,6 +151,7 @@ export class VimEngine {
     e.opCount = this.opCount
     e.awaitingRegister = this.awaitingRegister
     e.awaitingFind = this.awaitingFind
+    e.awaitingReplace = this.awaitingReplace
     e.awaitingObject = this.awaitingObject
     e.awaitingG = this.awaitingG
     e.lastFind = this.lastFind ? { ...this.lastFind } : null
@@ -184,6 +187,7 @@ export class VimEngine {
     }
     if (this.awaitingG) s += 'g'
     if (this.awaitingFind) s += this.awaitingFind
+    if (this.awaitingReplace) s += 'r'
     if (this.awaitingObject) s += this.awaitingObject
     return s
   }
@@ -252,6 +256,7 @@ export class VimEngine {
     this.registerName = null
     this.awaitingRegister = false
     this.awaitingFind = null
+    this.awaitingReplace = false
     this.awaitingObject = null
     this.awaitingG = false
   }
@@ -294,6 +299,18 @@ export class VimEngine {
       const op = this.awaitingFind
       this.awaitingFind = null
       return this.execFind(op, key)
+    }
+    if (this.awaitingReplace) {
+      this.awaitingReplace = false
+      if (key === '<Esc>') {
+        this.resetCmd()
+        return ok()
+      }
+      if (key.length !== 1) {
+        this.resetCmd()
+        return ok(false)
+      }
+      return this.execReplace(key)
     }
     if (this.awaitingObject) {
       const inner = this.awaitingObject === 'i'
@@ -350,6 +367,13 @@ export class VimEngine {
       case 'T':
         this.awaitingFind = key
         return ok()
+      case 'r':
+        this.awaitingReplace = true
+        return ok()
+      case '%':
+      case '{':
+      case '}':
+        return this.execMotion(key)
       case ';':
       case ',':
         return this.execRepeatFind(key)
@@ -559,6 +583,18 @@ export class VimEngine {
       case 'G':
         mr = M.gotoLine(this.lines, this.count ?? null)
         break
+      case '%':
+        mr = M.matchParen(this.lines, this.cursor) ?? {
+          target: { ...this.cursor },
+          kind: 'exclusive',
+        }
+        break
+      case '{':
+        mr = M.paraMotion(-1, this.lines, this.cursor)
+        break
+      case '}':
+        mr = M.paraMotion(1, this.lines, this.cursor)
+        break
       default:
         this.resetCmd()
         return { handled: false }
@@ -636,7 +672,45 @@ export class VimEngine {
       ;[a, b] = [b, a]
       if (kind === 'exclusive') inclusive = false
     }
-    if (kind === 'exclusive') {
+    if (kind === 'exclusive' && op !== '>' && op !== '<') {
+      // 目标是后续行行首（d} / d{ / db 跨空行）：半开区间 [a, b) 吞掉 b 之前所有换行，
+      // 含段落后的空行——prevChar→inclusive 转换表达不了「吞空行」
+      if (b.col === 0 && b.line > a.line) {
+        const removed = [
+          this.lines[a.line].slice(a.col),
+          ...this.lines.slice(a.line + 1, b.line),
+        ]
+        if (op === 'y') {
+          this.registers.yank(this.takeRegister(), {
+            text: removed,
+            linewise: false,
+            blockwise: false,
+          })
+          this.cursor = this.clamp(a)
+          this.resetCmd()
+          return
+        }
+        const joined = this.lines[a.line].slice(0, a.col) + this.lines[b.line]
+        const next = [...this.lines.slice(0, a.line), joined, ...this.lines.slice(b.line + 1)]
+        this.beginChange()
+        try {
+          this.setLines(next)
+          this.registers.delete(this.takeRegister(), {
+            text: removed,
+            linewise: false,
+            blockwise: false,
+          })
+          if (op === 'c') {
+            this.cursor = this.clamp({ line: a.line, col: a.col })
+            this.enterInsert({ line: a.line, col: a.col })
+          } else {
+            this.cursor = this.clamp(a)
+          }
+        } finally {
+          if (op !== 'c') this.endChange()
+        }
+        return
+      }
       const prev = M.prevChar(this.lines, b)
       if (!prev || cmp(prev, a) < 0) {
         // 空范围
@@ -834,6 +908,29 @@ export class VimEngine {
       }
     } finally {
       if (op !== 'c') this.endChange()
+    }
+    this.resetCmd()
+    return ok(true)
+  }
+
+  /** r{char}：替换光标起的 n 个字符，光标停在最后一个被替换字符上；行尾不足则替换到行尾 */
+  private execReplace(ch: string): PressResult {
+    const n = this.count ?? 1
+    const line = this.lines[this.cursor.line]
+    const end = Math.min(this.cursor.col + n - 1, line.length - 1)
+    if (end < this.cursor.col) {
+      this.resetCmd()
+      return ok(false)
+    }
+    this.beginChange()
+    try {
+      const next = [...this.lines]
+      next[this.cursor.line] =
+        line.slice(0, this.cursor.col) + ch.repeat(end - this.cursor.col + 1) + line.slice(end + 1)
+      this.setLines(next)
+      this.cursor = { line: this.cursor.line, col: end }
+    } finally {
+      this.endChange()
     }
     this.resetCmd()
     return ok(true)

@@ -60,8 +60,14 @@ export function loadedLevels(): Level[] {
     .sort((a, b) => a.chapter - b.chapter || levelOrder(a.id) - levelOrder(b.id))
 }
 
+/**
+ * 关卡序：id 尾部「两位数字 + 可选字母」（ch3-06a = 插在 06 与 07 之间的补课关）。
+ * 数字必须零填充两位——排序按数值，字母按序号+小数权重。
+ */
 function levelOrder(id: string): number {
-  return Number(/-(\d+)$/.exec(id)?.[1] ?? 0)
+  const m = /-(\d+)([a-z]?)$/.exec(id)
+  if (!m) return 0
+  return Number(m[1]) + (m[2] ? (m[2]!.charCodeAt(0) - 96) / 26 : 0)
 }
 
 export function levelById(id: string): Level | undefined {

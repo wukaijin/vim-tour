@@ -2,8 +2,8 @@ import { parseKeys, type Key } from './types'
 
 export type FeedVerdict = 'match' | 'prefix' | 'reject'
 
-/** 这些键之后 vim 会等待一个任意字符（find 家族）；白名单放行该字符本身 */
-const AWAIT_CHAR_KEYS = new Set<Key>(['f', 'F', 't', 'T'])
+/** 这些键之后 vim 会等待一个任意字符（find / r 家族）；白名单放行该字符本身 */
+const AWAIT_CHAR_KEYS = new Set<Key>(['f', 'F', 't', 'T', 'r'])
 
 /**
  * 按键序列白名单过滤器。

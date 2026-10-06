@@ -176,6 +176,36 @@ const chapter2: Level[] = [
     ],
   },
   {
+    id: 'ch2-06a',
+    chapter: 2,
+    title: '配对与段落',
+    brief: '闭括号藏在哪一行不用数：% 一键跳到配对；}} 跨过整段空行落到下一段首（{ 是它的反向）。',
+    hints: [
+      '% 在括号上直接跳到另一半；} 跳到下一个段落首行（段落 = 空行分隔的行块），按两次跨两段。',
+      '完整解：% x } } x（跳到闭括号删掉，跳两段到末行删行首杠）。',
+    ],
+    allowedKeys: keysOf([
+      'esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq',
+      'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G',
+      'f', 'F', 't', 'T', 'semicolon', 'comma', 'matchparen', 'para',
+    ]),
+    teaches: ['matchparen', 'para'],
+    texts: [
+      {
+        start: ['f(a,', '  b)', '', 'one two', '', '-tail'],
+        target: ['f(a,', '  b', '', 'one two', '', 'tail'],
+        cursor: { line: 0, col: 1 },
+        parKeys: '%x}}x',
+      },
+      {
+        start: ['g(z,', '  w)', '', 'aa bb', '', '-end'],
+        target: ['g(z,', '  w', '', 'aa bb', '', 'end'],
+        cursor: { line: 0, col: 1 },
+        parKeys: '%x}}x',
+      },
+    ],
+  },
+  {
     id: 'ch2-07',
     chapter: 2,
     title: '第 2 章毕业考',

@@ -112,6 +112,30 @@ export const COMMANDS: CommandMeta[] = [
     seqs: [':wq', ':w', ':q'],
     chapter: 1,
   },
+  {
+    id: 'replace',
+    keys: 'r',
+    mode: 'normal',
+    desc: 'r{字符}：把光标处字符换成它，不进插入模式',
+    example: { keys: 'rx', effect: '光标处字符原地替换成 x' },
+    chapter: 1,
+  },
+  {
+    id: 'redo',
+    keys: '<C-r>',
+    mode: 'normal',
+    desc: '重做：u 撤销多了，按它把撤销掉的重做回来',
+    example: { keys: 'xu<C-r>', effect: '删一个字符，撤销，再重做回来' },
+    chapter: 1,
+  },
+  {
+    id: 'appendEol',
+    keys: 'A',
+    mode: 'normal',
+    desc: '行尾进入插入模式（$a 的合体键），行尾补字符首选',
+    example: { keys: 'A;<Esc>', effect: '行尾补一个分号' },
+    chapter: 1,
+  },
 
   // ========== 第 2 章 · 词与行移动 ==========
   {
@@ -231,6 +255,22 @@ export const COMMANDS: CommandMeta[] = [
     example: { keys: ',', effect: '往回找上一个匹配字符' },
     chapter: 2,
   },
+  {
+    id: 'matchparen',
+    keys: '%',
+    mode: 'normal',
+    desc: '跳到配对括号：光标在 ( ) [ ] { } 上（或行内向后找第一个）时跳到另一半',
+    example: { keys: '%', effect: '从 ( 直接跳到配对的 ) 上' },
+    chapter: 2,
+  },
+  {
+    id: 'para',
+    keys: '{ }',
+    mode: 'normal',
+    desc: '} 跳到下一段落首行，{ 跳回上一段（段落 = 空行分隔的行块）',
+    example: { keys: '}', effect: '光标移到下一个空行之后的段首' },
+    chapter: 2,
+  },
 
   // ========== 第 3 章 · 操作符+移动（PLAN §4） ==========
   {
@@ -239,8 +279,8 @@ export const COMMANDS: CommandMeta[] = [
     mode: 'normal',
     desc: '删除操作符：d 后面接一个移动命令，删掉从光标到目标的文本。dw 删一个词，d$ 删到行尾。',
     example: { keys: 'dw', effect: '删掉光标所在的整个词（含词尾空格）' },
-    seqs: ['dw', 'de', 'db', 'd0', 'd$', 'd^', 'dj', 'dk', 'dG', 'dgg', 'df', 'dF', 'dt', 'dT'],
-    pattern: /^(?:[1-9][0-9]*)?d(?:[1-9][0-9]*)?(?:dd|w|e|b|0|\$|\^|j|k|G|gg|f|F|t|T)/,
+    seqs: ['dw', 'de', 'db', 'd0', 'd$', 'd^', 'dj', 'dk', 'dG', 'dgg', 'df', 'dF', 'dt', 'dT', 'd%', 'd}', 'd{'],
+    pattern: /^(?:[1-9][0-9]*)?d(?:[1-9][0-9]*)?(?:dd|w|e|b|0|\$|\^|j|k|G|gg|f|F|t|T|%|}|{)/,
     chapter: 3,
   },
   {
@@ -249,7 +289,7 @@ export const COMMANDS: CommandMeta[] = [
     mode: 'normal',
     desc: '修改操作符：像 d 一样删到目标，但删完直接进入插入模式。cw = 改一个词。',
     example: { keys: 'cwnew<Esc>', effect: '把当前词改成 new' },
-    seqs: ['cw', 'ce', 'cb', 'c0', 'c$', 'c^', 'cj', 'ck', 'cc', 'cG', 'cgg', 'cf', 'cF', 'ct', 'cT'],
+    seqs: ['cw', 'ce', 'cb', 'c0', 'c$', 'c^', 'cj', 'ck', 'cc', 'cG', 'cgg', 'cf', 'cF', 'ct', 'cT', 'c%', 'c}', 'c{'],
     pattern: /^(?:[1-9][0-9]*)?c(?:[1-9][0-9]*)?(?:cc|w|e|b|0|\$|\^|j|k|G|gg|f|F|t|T)/,
     chapter: 3,
   },
@@ -259,7 +299,7 @@ export const COMMANDS: CommandMeta[] = [
     mode: 'normal',
     desc: '复制操作符（yank）：像 d 一样圈定范围，但不删，抄进寄存器。yw 复制一个词。',
     example: { keys: 'ywp', effect: '复制当前词并贴在后面' },
-    seqs: ['yw', 'ye', 'yb', 'y0', 'y$', 'y^', 'yj', 'yk', 'yG', 'ygg', 'yf', 'yF', 'yt', 'yT'],
+    seqs: ['yw', 'ye', 'yb', 'y0', 'y$', 'y^', 'yj', 'yk', 'yG', 'ygg', 'yf', 'yF', 'yt', 'yT', 'y%', 'y}', 'y{'],
     pattern: /^(?:[1-9][0-9]*)?y(?:[1-9][0-9]*)?(?:yy|w|e|b|0|\$|\^|j|k|G|gg|f|F|t|T)/,
     chapter: 3,
   },
@@ -286,6 +326,38 @@ export const COMMANDS: CommandMeta[] = [
     desc: '计数前缀：数字放在命令前让它重复 n 次——2dd 删两行、3w 跳三个词、d2w 删两个词。',
     example: { keys: '2dd', effect: '一次删掉两行' },
     pattern: /^[1-9][0-9]*(?:dd|dw|de|cw|cc|yy|yw|j|k|w|b|e|x|gg|G|J)$/,
+    chapter: 3,
+  },
+  {
+    id: 'putBefore',
+    keys: 'P',
+    mode: 'normal',
+    desc: '粘贴到当前位置之前：行寄存器贴到上一行，字符寄存器贴到光标前（p 的反向）。',
+    example: { keys: 'yyP', effect: '复制当前行并贴到上一行' },
+    chapter: 3,
+  },
+  {
+    id: 'eolops',
+    keys: 'D C',
+    mode: 'normal',
+    desc: 'D 删到行尾（d$ 的快捷键），C 改到行尾直接输入（c$ 的快捷键）。',
+    example: { keys: 'Cnew<Esc>', effect: '删掉光标起到行尾并输入 new' },
+    chapter: 3,
+  },
+  {
+    id: 'chgenter',
+    keys: 's S',
+    mode: 'normal',
+    desc: 's 删当前字符进插入（= cl），S 清空整行进插入（= cc）。',
+    example: { keys: 'sx<Esc>', effect: '当前字符原地换成 x' },
+    chapter: 3,
+  },
+  {
+    id: 'insdelword',
+    keys: '<C-w>',
+    mode: 'insert',
+    desc: '插入模式里删掉光标前的一个词——整个词打错时比重敲退格快得多。',
+    example: { keys: 'ihello<C-w>hi<Esc>', effect: '输入 hello 后整词删掉，改输 hi' },
     chapter: 3,
   },
 
@@ -362,6 +434,24 @@ export const COMMANDS: CommandMeta[] = [
     seqs: ['ip', 'dip', 'cip', 'yip'],
     chapter: 4,
   },
+  {
+    id: 'ibrace',
+    keys: 'i{ a{',
+    mode: 'normal',
+    desc: '花括号文本对象：i{ 是 { … } 内部（不含括号），a{ 连花括号一起。',
+    example: { keys: 'ci{x<Esc>', effect: '把 { … } 里的内容换成 x' },
+    seqs: ['i{', 'i}', 'a{', 'a}', 'di{', 'di}', 'da{', 'da}', 'ci{', 'ci}', 'ca{', 'ca}', 'yi{', 'yi}', 'ya{', 'ya}', 'iB', 'diB', 'ciB', 'yiB'],
+    chapter: 4,
+  },
+  {
+    id: 'ibrack',
+    keys: 'i[ a[',
+    mode: 'normal',
+    desc: '方括号文本对象：i[ 是 [ … ] 内部（不含括号），a[ 连方括号一起。',
+    example: { keys: 'ci[x<Esc>', effect: '把 [ … ] 里的内容换成 x' },
+    seqs: ['i[', 'i]', 'a[', 'a]', 'di[', 'di]', 'da[', 'da]', 'ci[', 'ci]', 'ca[', 'ca]', 'yi[', 'yi]', 'ya[', 'ya]'],
+    chapter: 4,
+  },
 
   // ========== 第 5 章 · Visual 模式（PLAN §4；本章起按键白名单完全放开 §2.5） ==========
   {
@@ -416,6 +506,15 @@ export const COMMANDS: CommandMeta[] = [
     desc: '块可视化下按 A：在块的右缘之后追加——首行输入的文本，Esc 后套用到块的每一行；太短的行跳过。',
     example: { keys: '<C-v>jjllllA;<Esc>', effect: '三行行尾都补上分号' },
     seqs: ['A'],
+    chapter: 5,
+  },
+  {
+    id: 'vswap',
+    keys: 'o',
+    mode: 'visual',
+    desc: 'Visual 选区中按 o：光标跳到选区另一端——选过头不用退出重来。',
+    example: { keys: 'vjlo', effect: '选中两行后光标跳回选区首端' },
+    seqs: ['o'],
     chapter: 5,
   },
 

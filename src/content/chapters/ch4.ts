@@ -181,6 +181,35 @@ const chapter4: Level[] = [
     ],
   },
   {
+    id: 'ch4-06a',
+    chapter: 4,
+    title: '花括号与方括号',
+    brief: 'i( 会了，i{ i[ 是同一招：光标放进 { … } 或 [ … ] 里（或括号本身上），ci{ / ci[ 整块重写。',
+    hints: [
+      'i{ 是花括号内部、i[ 是方括号内部（a{ a[ 连括号一起）；c + 对象 = 清空重写。',
+      '完整解：c i { new <Esc> j f [ c i [ <Esc>（花括号内容换成 new；下方方括号清空）。',
+    ],
+    allowedKeys: keysOf([
+      ...CH123, 'replace', 'redo', 'appendEol', 'matchparen', 'para', 'putBefore', 'eolops', 'chgenter', 'insdelword',
+      ...OBJ[6], 'ibrace', 'ibrack',
+    ]),
+    teaches: ['ibrace', 'ibrack'],
+    texts: [
+      {
+        start: ['cfg = {old}', 'xs = [1 2 3]'],
+        target: ['cfg = {new}', 'xs = []'],
+        cursor: { line: 0, col: 6 },
+        parKeys: 'ci{new<Esc>jf[ci[<Esc>',
+      },
+      {
+        start: ['opt = {bad}', 'ys = [9 8 7]'],
+        target: ['opt = {new}', 'ys = []'],
+        cursor: { line: 0, col: 6 },
+        parKeys: 'ci{new<Esc>jf[ci[<Esc>',
+      },
+    ],
+  },
+  {
     id: 'ch4-07',
     chapter: 4,
     title: '第 4 章毕业考',

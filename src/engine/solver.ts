@@ -30,7 +30,8 @@ const DEFAULT_MAX_KEYS = 20
 
 /** 撤销键排除（PLAN §14.3：3 星本就禁用撤销，最优解不含撤销） */
 const UNDO_KEYS = new Set<Key>(['u', '<C-r>'])
-const FIND_KEYS = new Set<Key>(['f', 'F', 't', 'T'])
+/** 等待参数字符的键：find 家族 + r（参数字符同用 bounds.findChars） */
+const FIND_KEYS = new Set<Key>(['f', 'F', 't', 'T', 'r'])
 
 /** find 家族的参数字符：任意可打印字符 */
 const ANY_CHAR: Key[] = (() => {
