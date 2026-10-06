@@ -96,10 +96,7 @@ const chapter2: Level[] = [
     ],
     allowedKeys: [
       ...keysOf(['esc', 'i', 'hjkl', 'x', 'a', 'o', 'dd', 'yy', 'p', 'u', 'wq', 'replace', 'redo', 'appendEol', 'w', 'b', 'e', 'zero', 'caret', 'dollar', 'gg', 'G']),
-      '2gg',
-      '3gg',
-      '4gg',
-      '5gg',
+      '2gg', // {count}gg 形态样本：KeyFilter 数字段通配，任意 ngg 可按（gg 的行号参数）
     ],
     teaches: ['gg', 'G'],
     texts: [

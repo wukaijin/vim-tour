@@ -322,6 +322,8 @@ export const COMMANDS: CommandMeta[] = [
   {
     id: 'count',
     keys: '2dd',
+    // 两个形态样本（前缀/中缀）；KeyFilter 把数字段通配为任意 [1-9][0-9]*，样本只锚形态不锚数值
+    seqs: ['2dd', 'd2w'],
     mode: 'normal',
     desc: '计数前缀：数字放在命令前让它重复 n 次——2dd 删两行、3w 跳三个词、d2w 删两个词。',
     example: { keys: '2dd', effect: '一次删掉两行' },

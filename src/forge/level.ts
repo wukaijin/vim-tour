@@ -18,8 +18,11 @@ export type SolverOutcome = { ok: true; keys: Key[] } | { ok: false; reason: 'bu
 
 export type Solver = (input: SolverInput) => SolverOutcome
 
-/** 计数形态的固定补充（KeyFilter 是字面 trie，计数前缀需显式列入） */
-const COUNT_SEQS = ['2dd', '3dd', '2w', '3w', '2b', '2e', '2j', '2k', '2yy', '2dw', '2cw', '2x']
+/**
+ * 计数形态样本（tier≥3 即 count 已教）：每个形态一条样本锚定 trie 路径，
+ * 数字段本身由 KeyFilter 通配为任意 [1-9][0-9]*（2dd 同时放行 3dd/10dd）。
+ */
+const COUNT_SEQS = ['2dd', '2w', '2b', '2e', '2j', '2k', '2yy', '2dw', '2cw', '2x']
 
 /**
  * 命令档 → 玩家白名单（PLAN §14.1）：该档全部已教命令。

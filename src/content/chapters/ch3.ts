@@ -128,7 +128,7 @@ const chapter3: Level[] = [
       'J 把下一行接到本行尾，自动补空格；命令前加数字表示重复，2dd 一次删两行。',
       '完整解：J j 2dd（先合并前两行，下移到废行，连删两行）。',
     ],
-    allowedKeys: [...keysOf([...CH12, 'd', 'c', 'y', 'J', 'count']), '2dd'],
+    allowedKeys: keysOf([...CH12, 'd', 'c', 'y', 'J', 'count']),
     teaches: ['J', 'count'],
     texts: [
       {
@@ -154,7 +154,7 @@ const chapter3: Level[] = [
       '数字可以插在中间：d2w 删两个词；. 重复上一次修改，同样的动作不用再敲一遍。',
       '完整解：d 2 w .（删两个词，再重复一次）。',
     ],
-    allowedKeys: [...keysOf([...CH12, 'd', 'c', 'y', 'J', 'count', 'dot']), '2dd', 'd2w'],
+    allowedKeys: keysOf([...CH12, 'd', 'c', 'y', 'J', 'count', 'dot']),
     teaches: ['dot'],
     texts: [
       {

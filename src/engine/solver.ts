@@ -43,6 +43,13 @@ const ANY_CHAR: Key[] = (() => {
 /** cmdline 语法字符（在题面字符之外仍可能需要，如 :s/…/…/g 的 s g 斜杠） */
 const CMDLINE_EXTRA = 'sgivn%.,$[](){}|^*-?/&0123456789'
 
+/** normal/visual 层的搜索字母表：序列字面键；白名单含数字段时并入 0-9（count 通配，trie 挡位置） */
+function alphabetOf(allowedKeys: string[]): Key[] {
+  const keys = [...new Set(allowedKeys.flatMap((s) => parseKeys(s)))]
+  if (allowedKeys.some((s) => /[1-9]/.test(s))) keys.push(...'0123456789'.split(''))
+  return keys.filter((k) => !UNDO_KEYS.has(k))
+}
+
 /**
  * 最短解搜索（PLAN §14.3）：在真引擎状态空间上按键数做 BFS，首个到达的成功态即最短解。
  * - 字母表按模式建模白名单，与 LevelRun.passesFilter 同语义（insert/cmdline 是文本输入态，不走白名单）；
@@ -59,7 +66,7 @@ export function solve(input: SolveInput, opts: SolveOptions = {}): SolveResult {
 
   const chars = new Set([...input.start.join('\n'), ...target.join('\n'), ' '])
   const textChars = [...chars]
-  const normalAlphabet = [...new Set(input.allowedKeys.flatMap((s) => parseKeys(s)))].filter((k) => !UNDO_KEYS.has(k))
+  const normalAlphabet = alphabetOf(input.allowedKeys)
   // 搜索空间剪枝（只影响「不必要地绕远」的题；小用例由无剪枝暴力 BFS 比对把关）：
   // ① 行长不超过 start/target 的最大行长——临时超长的行迟早要删，最优解不会绕；
   // ② 行数不超过 start/target 的最大行数——同理，多开的行迟早要删；
@@ -195,7 +202,7 @@ export function candidatesAt(input: SolveInput, keys: Key[]): Key[] {
     engine.press(k)
   }
   const chars = new Set([...input.start.join('\n'), ...input.target.join('\n'), ' '])
-  const normalAlphabet = [...new Set(input.allowedKeys.flatMap((s) => parseKeys(s)))].filter((k) => !UNDO_KEYS.has(k))
+  const normalAlphabet = alphabetOf(input.allowedKeys)
   return candidates(engine, filter, normalAlphabet, [...chars], input.target, {
     maxLineLen: Math.max(1, ...input.start.map((l) => l.length), ...input.target.map((l) => l.length)),
     maxLines: Math.max(input.start.length, input.target.length),
