@@ -57,7 +57,7 @@ function onImportFile(e: Event): void {
           <span>命令档</span>
           <select v-model.number="forge.params.tier">
             <option v-for="t in FORGE_TIERS" :key="t" :value="t">第 {{ t }} 章</option>
-            <option value="random">随机（每次生成抽一章）</option>
+            <option value="random">随机（每次抽一章）</option>
           </select>
         </label>
         <label class="knob">
@@ -76,7 +76,7 @@ function onImportFile(e: Event): void {
           <span>每行字符上限</span>
           <input v-model.number="forge.params.maxCols" type="number" min="16" max="64" />
         </label>
-        <label class="knob wide">
+        <label class="knob full">
           <span>题材（可空）</span>
           <input v-model="forge.params.theme" type="text" placeholder="例如：nginx 配置、日志排查" />
         </label>
@@ -99,8 +99,8 @@ function onImportFile(e: Event): void {
           <span class="sub-title">模型设置</span>
           <span class="sub-hint mono">{{ serviceLabel }}</span>
         </summary>
-        <div class="knobs">
-          <label class="knob wide">
+        <div class="knobs model">
+          <label class="knob">
             <span>服务</span>
             <select v-model="forge.providerKind">
               <option value="demo">离线演示（无需 key）</option>
@@ -108,11 +108,11 @@ function onImportFile(e: Event): void {
             </select>
           </label>
           <template v-if="forge.providerKind === 'openai'">
-            <label class="knob wide">
+            <label class="knob">
               <span>服务地址</span>
               <input v-model="forge.baseUrl" type="text" placeholder="http://localhost:11434/v1" />
             </label>
-            <label class="knob wide">
+            <label class="knob full">
               <span>模型名</span>
               <input v-model="forge.model" type="text" placeholder="qwen2.5-coder:7b" />
             </label>
@@ -120,30 +120,46 @@ function onImportFile(e: Event): void {
         </div>
 
         <template v-if="forge.providerKind === 'openai'">
-          <div class="row">
-            <input v-model="forge.keyInput" type="password" class="grow" placeholder="API key（本地模型可留空）" />
-            <button class="btn small" @click="forge.saveKey()">保存</button>
-            <button v-if="forge.keyStored" class="btn small ghost" @click="forge.forgetKey()">清除</button>
-          </div>
-          <div class="row">
-            <label class="chk">
-              <input v-model="forge.rememberKey" type="checkbox" :disabled="!forge.canRemember" />
-              记住（口令加密）
-            </label>
+          <!-- 锁定态（已存 key 待解锁）：口令行常驻。原先挂在「记住」勾选下，
+               解锁得先勾记住——把「是否持久化」和「本次解锁」两个意图拧在一起，
+               且 rememberKey 刷新即失，已记住的 key 每次都要重勾一遍才露出输入框 -->
+          <div v-if="forge.keyStored && !forge.keyUnlocked" class="row">
             <input
-              v-if="forge.rememberKey"
               v-model="forge.passphrase"
               type="password"
               class="grow"
-              :placeholder="forge.keyStored && !forge.keyUnlocked ? '输入口令解锁' : '口令（≥6 位）'"
+              placeholder="输入口令解锁已保存的 key"
+              @keydown.enter="forge.unlockKey()"
             />
-            <button v-if="forge.keyStored && !forge.keyUnlocked" class="btn small" @click="forge.unlockKey()">
-              解锁
-            </button>
+            <button class="btn small" @click="forge.unlockKey()">解锁</button>
+            <button class="btn small ghost" @click="forge.forgetKey()">清除</button>
           </div>
+          <template v-else>
+            <div class="row">
+              <input v-model="forge.keyInput" type="password" class="grow" placeholder="API key（本地模型可留空）" />
+              <button class="btn small" @click="forge.saveKey()">保存</button>
+              <button v-if="forge.keyStored" class="btn small ghost" @click="forge.forgetKey()">清除</button>
+            </div>
+            <div class="row">
+              <label class="chk">
+                <input v-model="forge.rememberKey" type="checkbox" :disabled="!forge.canRemember" />
+                记住（口令加密）
+              </label>
+              <input
+                v-if="forge.rememberKey"
+                v-model="forge.passphrase"
+                type="password"
+                class="grow"
+                placeholder="口令（≥6 位）"
+              />
+            </div>
+          </template>
           <p class="hint">
             <template v-if="!forge.canRemember">
               当前环境不支持加密存储（crypto.subtle 不可用），key 只能保存在本次会话。
+            </template>
+            <template v-else-if="forge.keyStored && !forge.keyUnlocked">
+              key 已用口令加密保存在本机，输入口令解锁本次会话；忘了口令就清除重填（防的是顺手翻看与备份泄露，防不了页面被注入）。
             </template>
             <template v-else>
               默认只放内存、关页即忘；勾选「记住」用口令派生的密钥加密后落本机（防的是顺手翻看与备份泄露，防不了页面被注入）。
@@ -245,11 +261,12 @@ function onImportFile(e: Event): void {
   font-size: var(--fs-lg);
 }
 
-/* 生成台旋钮：定宽栅格而非裸 flex——裸排时「命令档」95px、「题材」310px，
-   字段宽度与内容语义零关联，读起来像没排版 */
+/* 生成台旋钮：四列栅格——两个 select 吃弹性宽度（命令档的「随机（每次抽一章）」
+   约 200px，定窄列必截断；难度选项带键数区间也不短），两个数字列固定等宽；
+   题材独占整行（.full），不再换行后只占半行留空洞 */
 .knobs {
   display: grid;
-  grid-template-columns: 104px 176px 88px 112px 1fr;
+  grid-template-columns: minmax(196px, 1.2fr) minmax(176px, 1fr) 112px 112px;
   gap: var(--sp-3);
 }
 
@@ -261,17 +278,21 @@ function onImportFile(e: Event): void {
   color: var(--ink-2);
 }
 
-/* 模型设置里的字段跨多列：地址与模型名需要横向空间 */
-.knob.wide {
-  grid-column: span 2;
+/* 独占整行的字段（题材、模型名） */
+.knob.full {
+  grid-column: 1 / -1;
+}
+
+/* 模型设置两列：服务窄、地址宽（URL 是该行最长内容，先前反比地址还窄）；
+   模型名独占整行，与生成台的题材行同一节奏 */
+.knobs.model {
+  grid-template-columns: minmax(200px, 2fr) 3fr;
 }
 
 @media (max-width: 720px) {
-  .knobs {
+  .knobs,
+  .knobs.model {
     grid-template-columns: 1fr 1fr;
-  }
-  .knob.wide {
-    grid-column: span 2;
   }
 }
 
@@ -305,10 +326,14 @@ function onImportFile(e: Event): void {
   font-family: var(--font-mono);
 }
 
-/* —— 模型设置：生成台的次级折叠区块 —— */
+/* —— 模型设置：生成台的次级折叠区块 ——
+   展开后的行距走 grid gap：key 行/口令行是裸 flow 堆叠时 0 间距，
+   三行输入框边框首尾相接熔成一块、聚焦环叠压相邻元素 */
 .sub {
   border-top: 1px solid var(--edge);
   padding-top: var(--sp-3);
+  display: grid;
+  gap: var(--sp-3);
 }
 
 .sub-sum {
@@ -354,10 +379,6 @@ function onImportFile(e: Event): void {
   white-space: nowrap;
 }
 
-.sub[open] > .sub-sum {
-  margin-bottom: var(--sp-3);
-}
-
 .row {
   display: flex;
   align-items: center;
@@ -368,11 +389,14 @@ function onImportFile(e: Event): void {
 .row .grow {
   flex: 1 1 220px;
   font: inherit;
+  /* 与 .knob 输入框同字号：key 行（16px）曾比模型设置的输入框（14px）高 3px，同区不同高 */
+  font-size: var(--fs-sm);
   color: var(--ink);
   background: var(--paper);
   border: 1px solid var(--edge);
   border-radius: var(--r-input);
   padding: 8px 10px;
+  min-height: 36px;
 }
 
 .hint {

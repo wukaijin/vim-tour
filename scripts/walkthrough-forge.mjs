@@ -207,6 +207,38 @@ const run = async () => {
     : fail('T7 设置持久化', `${providerAfter}|${urlAfter}|${modelAfter}|${themeAfter}`)
   await shot(page, 't55-forge-settings-persist')
 
+  // —— T8 锁定态解锁：已存 key 重载后口令行常驻，不挂在「记住」勾选下 ——
+  // （记住勾选是易失 UI 态，旧交互刷新后必须重勾才露出解锁框——把「是否持久化」
+  //   和「本次解锁」两个意图拧在一起；此用例锁住拆分后的行为）
+  await page.getByPlaceholder('API key（本地模型可留空）').fill('sk-test-key')
+  await page.locator('.chk input').check()
+  await page.getByPlaceholder('口令（≥6 位）').fill('pass123456')
+  await page.getByRole('button', { name: '保存' }).click()
+  await page.waitForTimeout(250)
+  await page.reload()
+  await page.waitForSelector('.forge', { timeout: 8000 })
+  await page.locator('.sub-sum').click()
+  await page.waitForTimeout(200)
+  const unlockInput = page.getByPlaceholder('输入口令解锁已保存的 key')
+  const unlockCount = await unlockInput.count()
+  const chkCount = await page.locator('.chk').count()
+  unlockCount === 1 && chkCount === 0
+    ? ok('T8 锁定态口令行常驻（无需先勾记住）')
+    : fail('T8 锁定态', `解锁框 ${unlockCount} 个、记住勾选 ${chkCount} 个`)
+  await shot(page, 't56-forge-key-locked')
+  await unlockInput.fill('wrong-pass')
+  await page.getByRole('button', { name: '解锁' }).click()
+  await page.waitForTimeout(250)
+  ;(await page.locator('.msg.err').count()) === 1
+    ? ok('T8 错口令被拒')
+    : fail('T8 错口令', '未出现错误提示')
+  await unlockInput.fill('pass123456')
+  await unlockInput.press('Enter')
+  await page.waitForTimeout(250)
+  ;(await page.getByPlaceholder('API key（本地模型可留空）').count()) === 1
+    ? ok('T8 对口令解锁回管理态')
+    : fail('T8 解锁', '未回管理态')
+
   await browser.close()
 }
 
