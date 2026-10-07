@@ -7,7 +7,7 @@ import { verifySandboxLevel } from '../../forge/level'
 import { createDemoProvider, DEMO_MODEL, DEMO_PARAMS } from '../../forge/providers/demo'
 import { createOpenAIProvider } from '../../forge/providers/openai'
 import { ForgeError, forgeErrorText } from '../../forge/providers/types'
-import type { ForgeProvider } from '../../forge/providers/types'
+import type { ChatDeltaEvent, ForgeProvider } from '../../forge/providers/types'
 import { DEFAULT_FORGE_PARAMS, rollTier } from '../../forge/types'
 import type { ForgeParams, ProviderKind, SandboxLevel } from '../../forge/types'
 import { detectStorage } from '../../storage/progress'
@@ -53,6 +53,11 @@ export const useForgeStore = defineStore('forge', () => {
   const errorText = ref<string | null>(null)
   const notice = ref<string | null>(null)
   const usageText = ref<string | null>(null)
+  // 流式进度（PLAN §14.7）：phase/字数给状态行，原文给剧透折叠块（封顶防长思考撑爆内存渲染）
+  const streamPhase = ref<'idle' | 'thinking' | 'output'>('idle')
+  const streamCount = reactive({ thinking: 0, output: 0 })
+  const streamRaw = reactive({ thinking: '', output: '' })
+  const STREAM_RAW_CAP = 20_000
   let controller: AbortController | null = null
   let noticeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -102,12 +107,25 @@ export const useForgeStore = defineStore('forge', () => {
     return createOpenAIProvider({ baseUrl: baseUrl.value, model: model.value, apiKey: custody.current() ?? undefined })
   }
 
+  function pushDelta(d: ChatDeltaEvent): void {
+    streamPhase.value = d.kind
+    streamCount[d.kind] += d.text.length
+    let merged = streamRaw[d.kind] + d.text
+    if (merged.length > STREAM_RAW_CAP) merged = '…' + merged.slice(merged.length - STREAM_RAW_CAP + 1)
+    streamRaw[d.kind] = merged
+  }
+
   /** 生成 → 闸门 → 入库（PLAN §14.2/§14.7：可见重试、可取消、失败分类文案） */
   async function generate(): Promise<void> {
     if (running.value) return
     errorText.value = null
     notice.value = null
     usageText.value = null
+    streamPhase.value = 'idle'
+    streamCount.thinking = 0
+    streamCount.output = 0
+    streamRaw.thinking = ''
+    streamRaw.output = ''
     let provider: ForgeProvider
     try {
       provider = buildProvider()
@@ -115,11 +133,13 @@ export const useForgeStore = defineStore('forge', () => {
       errorText.value = forgeErrorText(e)
       return
     }
+    // onDelta 在这里注入（而非穿 generateSandboxLevel）：生成编排仍只认「完整文本」，
+    // 流式展示纯属 UI 关切；演示 provider 也因此能模拟流式
     const wrapped: ForgeProvider = {
       id: provider.id,
       label: provider.label,
       chat: async (messages, opts) => {
-        const r = await provider.chat(messages, opts)
+        const r = await provider.chat(messages, { ...opts, onDelta: pushDelta })
         if (r.usage) {
           usageText.value = `本次调用 tokens：输入 ${r.usage.promptTokens ?? '—'} / 输出 ${r.usage.completionTokens ?? '—'}`
         }
@@ -261,6 +281,9 @@ export const useForgeStore = defineStore('forge', () => {
     errorText,
     notice,
     usageText,
+    streamPhase,
+    streamCount,
+    streamRaw,
     refreshLibrary,
     dismissNotice,
     generate,

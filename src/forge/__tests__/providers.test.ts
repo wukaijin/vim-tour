@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { chatCompletionsUrl, createOpenAIProvider } from '../providers/openai'
-import { createDemoProvider } from '../providers/demo'
+import { createDemoProvider, DEMO_DRAFT } from '../providers/demo'
 import { ForgeError } from '../providers/types'
-import type { ProviderConfig } from '../providers/types'
+import type { ChatDeltaEvent, ProviderConfig } from '../providers/types'
 import { extractJson, parseDraft } from '../parse'
 
 const cfg = (over: Partial<ProviderConfig> = {}): ProviderConfig => ({
@@ -76,7 +76,7 @@ describe('createOpenAIProvider（OpenAI 兼容）', () => {
     await expect(p.chat([])).rejects.toMatchObject({ kind: 'network' })
   })
 
-  it('超时 → timeout（默认 120s，测试注入短超时）', async () => {
+  it('超时 → timeout（默认 300s，测试注入短超时）', async () => {
     const p = createOpenAIProvider(cfg({ timeoutMs: 20 }), {
       fetchImpl: ((_url: string, init?: RequestInit) => hang(init)) as unknown as typeof fetch,
     })
@@ -123,12 +123,141 @@ describe('createOpenAIProvider（OpenAI 兼容）', () => {
   })
 })
 
+// —— SSE 流式（PLAN §14.7）：手写解析器的行为锁定 ——
+const enc = new TextEncoder()
+
+const sseResponse = (chunks: string[]): Response => {
+  const body = new ReadableStream<Uint8Array>({
+    start(c) {
+      for (const s of chunks) c.enqueue(enc.encode(s))
+      c.close()
+    },
+  })
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+}
+
+const frame = (obj: unknown): string => `data: ${JSON.stringify(obj)}\n\n`
+const contentFrame = (text: string): string => frame({ choices: [{ delta: { content: text } }] })
+const DONE = 'data: [DONE]\n\n'
+
+/** 首帧后停住不关流；abort 时 error 掉 controller——模拟真 fetch body 随 signal 取消 */
+const stalledSse = (init?: RequestInit): Response => {
+  let rc: ReadableStreamDefaultController<Uint8Array> | null = null
+  const body = new ReadableStream<Uint8Array>({
+    start(c) {
+      rc = c
+      c.enqueue(enc.encode(contentFrame('x')))
+    },
+  })
+  init?.signal?.addEventListener('abort', () => rc?.error(new DOMException('aborted', 'AbortError')))
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+}
+
+describe('createOpenAIProvider（SSE 流式）', () => {
+  it('增量累积成完整文本；thinking 多字段不进正文；尾帧 usage 被拾取', async () => {
+    const fetchImpl = vi.fn(async () =>
+      sseResponse([
+        frame({ choices: [{ delta: { reasoning_content: '想一想' } }] }), // DeepSeek 系
+        frame({ choices: [{ delta: { thinking: '再想想' } }] }), // Ollama
+        contentFrame('{"a"'),
+        contentFrame(':1}'),
+        frame({ choices: [], usage: { prompt_tokens: 5, completion_tokens: 7 } }),
+        DONE,
+      ]),
+    )
+    const p = createOpenAIProvider(cfg(), { fetchImpl: fetchImpl as unknown as typeof fetch })
+    const deltas: ChatDeltaEvent[] = []
+    const r = await p.chat([{ role: 'user', content: 'hi' }], { onDelta: (d) => deltas.push(d) })
+    expect(r.text).toBe('{"a":1}')
+    expect(r.usage).toEqual({ promptTokens: 5, completionTokens: 7 })
+    expect(deltas.map((d) => d.kind)).toEqual(['thinking', 'thinking', 'output', 'output'])
+    expect(deltas.filter((d) => d.kind === 'thinking').map((d) => d.text).join('')).toBe('想一想再想想')
+  })
+
+  it('跨 chunk 半行、注释行、坏 JSON 帧都不炸', async () => {
+    const p = createOpenAIProvider(cfg(), {
+      fetchImpl: (async () =>
+        sseResponse([
+          ': keep-alive\n\n',
+          'data: {"choices":[{"del', // 半行切断
+          'ta":{"content":"hi"}}]}\n\n',
+          'data: {broken\n\n',
+          DONE,
+        ])) as unknown as typeof fetch,
+    })
+    const deltas: ChatDeltaEvent[] = []
+    const r = await p.chat([], { onDelta: (d) => deltas.push(d) })
+    expect(r.text).toBe('hi')
+    expect(deltas).toEqual([{ kind: 'output', text: 'hi' }])
+  })
+
+  it('请求体带 stream:true；jsonMode=auto 的 400 重试仍保持流式', async () => {
+    const bodies: string[] = []
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      bodies.push(String(init?.body))
+      return bodies.length === 1 ? new Response('bad', { status: 400 }) : sseResponse([contentFrame('{"ok":1}'), DONE])
+    })
+    const p = createOpenAIProvider(cfg(), { fetchImpl: fetchImpl as unknown as typeof fetch })
+    const r = await p.chat([], { onDelta: () => {} })
+    expect(r.text).toBe('{"ok":1}')
+    expect(JSON.parse(bodies[0]!)).toMatchObject({ stream: true, response_format: { type: 'json_object' } })
+    const retry = JSON.parse(bodies[1]!)
+    expect(retry.stream).toBe(true)
+    expect(retry).not.toHaveProperty('response_format')
+  })
+
+  it('服务不理 stream 回整包 JSON：content-type 嗅探降级非流式解析', async () => {
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => okBody('{"x":9}'))
+    const p = createOpenAIProvider(cfg(), { fetchImpl: fetchImpl as unknown as typeof fetch })
+    const deltas: ChatDeltaEvent[] = []
+    const r = await p.chat([], { onDelta: (d) => deltas.push(d) })
+    expect(r.text).toBe('{"x":9}')
+    expect(deltas).toEqual([]) // 降级路径不产生增量，UI 只显示「等待模型响应」
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit
+    expect(JSON.parse(String(init.body)).stream).toBe(true) // 但请求确实要了流式
+  })
+
+  it('首帧后停住 → timeout（空闲语义：首帧已收到，超时按「没有新数据」计）', async () => {
+    const p = createOpenAIProvider(cfg({ timeoutMs: 40 }), {
+      fetchImpl: ((_url: string, init?: RequestInit) => stalledSse(init)) as unknown as typeof fetch,
+    })
+    const deltas: ChatDeltaEvent[] = []
+    await expect(p.chat([], { onDelta: (d) => deltas.push(d) })).rejects.toMatchObject({ kind: 'timeout' })
+    expect(deltas.length).toBe(1)
+  })
+
+  it('流式中途外部取消 → aborted', async () => {
+    const p = createOpenAIProvider(cfg(), {
+      fetchImpl: ((_url: string, init?: RequestInit) => stalledSse(init)) as unknown as typeof fetch,
+    })
+    const ctrl = new AbortController()
+    setTimeout(() => ctrl.abort(), 10)
+    await expect(p.chat([], { signal: ctrl.signal, onDelta: () => {} })).rejects.toMatchObject({ kind: 'aborted' })
+  })
+
+  it('200 流式但只有 thinking、无内容增量 → bad-response', async () => {
+    const p = createOpenAIProvider(cfg(), {
+      fetchImpl: (async () => sseResponse([frame({ choices: [{ delta: { reasoning_content: '只想不说' } }] }), DONE])) as unknown as typeof fetch,
+    })
+    await expect(p.chat([], { onDelta: () => {} })).rejects.toMatchObject({ kind: 'bad-response' })
+  })
+})
+
 describe('createDemoProvider（离线演示）', () => {
   it('默认直接给合规 fixture', async () => {
     const p = createDemoProvider()
     const r = await p.chat([])
     const raw = extractJson(r.text)
     expect(parseDraft(raw, { maxLines: 8, maxCols: 64 }).ok).toBe(true)
+  })
+
+  it('onDelta：一段 thinking + 切片 output，拼回完整正文', async () => {
+    const p = createDemoProvider()
+    const deltas: ChatDeltaEvent[] = []
+    const r = await p.chat([{ role: 'user', content: '出题' }], { onDelta: (d) => deltas.push(d) })
+    expect(deltas[0]?.kind).toBe('thinking')
+    expect(deltas.filter((d) => d.kind === 'output').map((d) => d.text).join('')).toBe(r.text)
+    expect(r.text).toBe(JSON.stringify(DEMO_DRAFT))
   })
 
   it('failFirst：第一次坏数据、第二次合规（覆盖回喂链路）', async () => {

@@ -23,6 +23,8 @@ const parHint = computed(() => {
 
 const parOf = (parKeys: string): number => parseKeys(parKeys).length
 
+const hasStreamRaw = computed(() => forge.streamRaw.thinking.length + forge.streamRaw.output.length > 0)
+
 /** 折叠标题行上的当前服务速览：不展开也能知道在用哪个 provider */
 const serviceLabel = computed(() =>
   forge.providerKind === 'openai' ? `${forge.model || '未填模型'} · ${forge.baseUrl || '未填地址'}` : '离线演示 · 无需 key',
@@ -88,6 +90,26 @@ function onImportFile(e: Event): void {
         <button v-if="forge.running" class="btn" @click="forge.cancel()">取消</button>
         <span class="hint">目标复杂度 {{ parHint }}，由本地求解器实算并验证</span>
       </div>
+
+      <!-- 流式进度（尽力而为）：只给进度感不给内容——thinking 在推导解法、output 就是含
+           parKeys 的题目 JSON，原文直出等于剧透答案；原文进下方折叠块（含剧透标注） -->
+      <div v-if="forge.running" class="stream" role="status" aria-live="polite">
+        <p class="stream-line">
+          <span v-if="forge.streamPhase === 'thinking'">模型思考中…</span>
+          <span v-else-if="forge.streamPhase === 'output'">正在生成题目结构…</span>
+          <span v-else>等待模型响应…</span>
+          <span class="stream-nums mono">思考 {{ forge.streamCount.thinking }} · 输出 {{ forge.streamCount.output }} 字</span>
+        </p>
+      </div>
+      <details v-if="hasStreamRaw" class="stream-raw">
+        <summary class="stream-raw-sum">
+          <span class="t">模型原始输出</span>
+          <span>含剧透（解法与 par）· 调试连接用</span>
+        </summary>
+        <pre v-if="forge.streamRaw.thinking" class="raw-block">{{ forge.streamRaw.thinking }}</pre>
+        <pre class="raw-block">{{ forge.streamRaw.output }}</pre>
+      </details>
+
       <p v-if="forge.errorText" class="msg err">{{ forge.errorText }}</p>
       <p v-else-if="forge.notice" class="msg ok">{{ forge.notice }}</p>
       <p v-if="forge.usageText" class="hint">{{ forge.usageText }}</p>
@@ -410,6 +432,88 @@ function onImportFile(e: Event): void {
   font-size: var(--fs-sm);
   border-radius: var(--r-input);
   padding: 8px 12px;
+}
+
+/* —— 流式进度：状态行 + 剧透折叠 ——
+   类名避开 .sub/.sub-sum：走查脚本用它们定位模型设置折叠区，重名会撞 strict mode */
+.stream {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.stream-line {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.stream-nums {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+/* 原始输出折叠块：纯调试位的次级观感，不做 .sub 那样的展开三角 */
+.stream-raw {
+  border-top: 1px solid var(--edge);
+  padding-top: var(--sp-2);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.stream-raw-sum {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  padding: 2px 0;
+}
+
+.stream-raw-sum::-webkit-details-marker {
+  display: none;
+}
+
+/* 展开箭头与「模型设置」同款（CSS 三角，零资源）——视觉验收指出无箭头时折叠块可发现性弱 */
+.stream-raw-sum::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 5px solid var(--ink-2);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform var(--dur-fast) var(--ease-out);
+  flex: none;
+  align-self: center;
+}
+
+.stream-raw[open] > .stream-raw-sum::before {
+  transform: rotate(90deg) translateX(-1px);
+}
+
+.stream-raw-sum .t {
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.raw-block {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--ink-2);
+  background: var(--paper);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-input);
+  padding: var(--sp-2) var(--sp-3);
+  max-height: 220px;
+  overflow: auto;
 }
 
 .msg.err {

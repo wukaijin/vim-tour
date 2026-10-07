@@ -1,5 +1,5 @@
 import { ForgeError } from './types'
-import type { ChatMessage, ChatResult, ChatUsage, ForgeProvider, ProviderConfig } from './types'
+import type { ChatDeltaEvent, ChatMessage, ChatResult, ChatUsage, ForgeProvider, ProviderConfig } from './types'
 
 /** base URL 归一化：'…/v1' → '…/v1/chat/completions'（已是完整路径则原样） */
 export function chatCompletionsUrl(baseUrl: string): string {
@@ -19,15 +19,15 @@ export interface OpenAIProviderDeps {
  */
 export function createOpenAIProvider(config: ProviderConfig, deps: OpenAIProviderDeps = {}): ForgeProvider {
   const fetchImpl = deps.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args))
-  const timeoutMs = config.timeoutMs ?? 120_000
+  const timeoutMs = config.timeoutMs ?? 300_000
   const jsonMode = config.jsonMode ?? 'auto'
   const url = chatCompletionsUrl(config.baseUrl)
 
-  async function request(messages: ChatMessage[], signal: AbortSignal, withJsonMode: boolean): Promise<Response> {
+  function request(messages: ChatMessage[], signal: AbortSignal, mode: { stream: boolean; json: boolean }): Promise<Response> {
     const headers: Record<string, string> = { 'content-type': 'application/json' }
     if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`
-    const body: Record<string, unknown> = { model: config.model, messages, temperature: 0.7, stream: false }
-    if (withJsonMode) body.response_format = { type: 'json_object' }
+    const body: Record<string, unknown> = { model: config.model, messages, temperature: 0.7, stream: mode.stream }
+    if (mode.json) body.response_format = { type: 'json_object' }
     return fetchImpl(url, { method: 'POST', headers, body: JSON.stringify(body), signal })
   }
 
@@ -37,10 +37,13 @@ export function createOpenAIProvider(config: ProviderConfig, deps: OpenAIProvide
     async chat(messages, opts): Promise<ChatResult> {
       if (!config.model.trim()) throw new ForgeError('config', '未填写模型名')
       const ctrl = new AbortController()
+      // 有增量消费者才流式：没有 onDelta 时走久经考验的非流式路径
+      const wantStream = opts?.onDelta !== undefined
       let timedOut = false
+      let streamAlive = false
       const classify = (e: unknown): ForgeError => {
         if (opts?.signal?.aborted) return new ForgeError('aborted', '已取消')
-        if (timedOut) return new ForgeError('timeout', `超过 ${timeoutMs}ms 未响应`)
+        if (timedOut) return new ForgeError('timeout', `超过 ${timeoutMs}ms ${streamAlive ? '没有新数据' : '未响应'}`)
         if (e instanceof ForgeError) return e
         return new ForgeError('network', e instanceof Error ? e.message : String(e))
       }
@@ -49,36 +52,111 @@ export function createOpenAIProvider(config: ProviderConfig, deps: OpenAIProvide
         if (opts.signal.aborted) throw new ForgeError('aborted', '已取消')
         opts.signal.addEventListener('abort', onAbort, { once: true })
       }
-      const timer = setTimeout(() => {
-        timedOut = true
-        ctrl.abort()
-      }, timeoutMs)
+      // 流式下超时 = 「无新数据」的空闲超时（每收到一帧重置）；非流式 = 整请求总时长（只设一次）
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const arm = (): void => {
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => {
+          timedOut = true
+          ctrl.abort()
+        }, timeoutMs)
+      }
       try {
+        arm()
         let res: Response
         try {
-          res = await request(messages, ctrl.signal, jsonMode !== 'off')
+          res = await request(messages, ctrl.signal, { stream: wantStream, json: jsonMode !== 'off' })
         } catch (e) {
           throw classify(e)
         }
         // 部分兼容服务不认 response_format：摘掉重试一次（jsonMode=auto 时）
         if (!res.ok && jsonMode === 'auto' && (res.status === 400 || res.status === 422)) {
+          arm()
           try {
-            res = await request(messages, ctrl.signal, false)
+            res = await request(messages, ctrl.signal, { stream: wantStream, json: false })
           } catch (e) {
             throw classify(e)
           }
         }
         if (!res.ok) throw await httpError(res)
+        // 服务不理 stream 参数、整包 JSON 返回：content-type 嗅探后走非流式解析
+        if (wantStream && res.body && (res.headers.get('content-type') ?? '').includes('text/event-stream')) {
+          streamAlive = true
+          try {
+            return await readSseChat(res, opts!.onDelta!, arm)
+          } catch (e) {
+            throw classify(e)
+          }
+        }
         const data: unknown = await res.json().catch(() => null)
         const text = contentOf(data)
         if (text === null) throw new ForgeError('bad-response', '响应里没有 choices[0].message.content')
         return { text, usage: usageOf(data) }
       } finally {
-        clearTimeout(timer)
+        if (timer) clearTimeout(timer)
         opts?.signal?.removeEventListener('abort', onAbort)
       }
     },
   }
+}
+
+/**
+ * SSE 流式读取（PLAN §14.7，零依赖手写）：行缓冲容忍跨 chunk 的半行。
+ * thinking 字段无行业标准：DeepSeek 系 reasoning_content、OpenRouter reasoning、
+ * Ollama thinking——多字段尝试，取不到就不产生 thinking 增量（不作机制依赖）。
+ */
+async function readSseChat(
+  res: Response,
+  onDelta: (delta: ChatDeltaEvent) => void,
+  onFrame: () => void,
+): Promise<ChatResult> {
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let content = ''
+  let usage: ChatUsage | undefined
+  const handleLine = (line: string): void => {
+    if (!line.startsWith('data:')) return // event:/id:/冒号注释行忽略
+    const payload = line.slice(5).replace(/^ /, '')
+    if (!payload || payload === '[DONE]') return
+    let obj: unknown
+    try {
+      obj = JSON.parse(payload)
+    } catch {
+      return // 坏帧跳过，不毒化整次响应
+    }
+    const delta = (obj as { choices?: Array<{ delta?: Record<string, unknown> }> }).choices?.[0]?.delta
+    if (delta) {
+      const think = firstString(delta.reasoning_content, delta.reasoning, delta.thinking)
+      if (think !== undefined) onDelta({ kind: 'thinking', text: think })
+      if (typeof delta.content === 'string' && delta.content.length > 0) {
+        content += delta.content
+        onDelta({ kind: 'output', text: delta.content })
+      }
+    }
+    const u = usageOf(obj)
+    if (u) usage = u // usage 常在尾帧（choices 为空数组）捎带
+  }
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    onFrame()
+    buf += decoder.decode(value, { stream: true })
+    let nl = buf.indexOf('\n')
+    while (nl !== -1) {
+      handleLine(buf.slice(0, nl).replace(/\r$/, ''))
+      buf = buf.slice(nl + 1)
+      nl = buf.indexOf('\n')
+    }
+  }
+  handleLine(buf.replace(/\r$/, '') + decoder.decode()) // 尾行无换行 + 解码器余量
+  if (content === '') throw new ForgeError('bad-response', '流式响应里没有内容增量')
+  return { text: content, usage }
+}
+
+function firstString(...vals: unknown[]): string | undefined {
+  for (const v of vals) if (typeof v === 'string' && v.length > 0) return v
+  return undefined
 }
 
 async function httpError(res: Response): Promise<ForgeError> {

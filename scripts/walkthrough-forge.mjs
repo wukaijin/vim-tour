@@ -85,11 +85,29 @@ const run = async () => {
 
   // —— T2 生成：演示 provider（先坏后好 → 覆盖回喂重试）——
   await page.getByRole('button', { name: '生成关卡' }).click()
+  // 流式进度行要在生成过程中出现（演示 provider 模拟增量：思考 → 切片输出）
+  const streamSeen = await page
+    .waitForSelector('.stream-line', { timeout: 5000 })
+    .then(() => true)
+    .catch(() => false)
+  streamSeen ? ok('T2 流式进度行可见（思考/生成状态）') : fail('T2 流式进度', '5s 内未见 .stream-line')
+  const streamText = await page.locator('.stream-line').textContent().catch(() => null)
+  streamText?.includes('字')
+    ? ok('T2 流式进度带字数计数')
+    : fail('T2 流式计数', String(streamText))
+  await shot(page, 't51a-forge-streaming')
   const cardAppeared = await page
     .waitForSelector('.level', { timeout: 20000 })
     .then(() => true)
     .catch(() => false)
   cardAppeared ? ok('T2 生成后入库出现关卡卡片') : fail('T2 生成', '20s 内未出现 .level')
+  // 原始输出折叠区：生成后仍在（调试连接用），默认折叠且标注剧透
+  const rawCount = await page.locator('.stream-raw').count()
+  rawCount === 1 ? ok('T2 模型原始输出折叠区存在') : fail('T2 原始输出', `count=${rawCount}`)
+  const rawOpen = await page.locator('.stream-raw').evaluate((el) => el.hasAttribute('open')).catch(() => null)
+  rawOpen === false ? ok('T2 原始输出默认折叠') : fail('T2 原始输出', `open=${rawOpen}`)
+  const rawSum = await page.locator('.stream-raw-sum').textContent().catch(() => null)
+  rawSum?.includes('剧透') ? ok('T2 原始输出标注剧透') : fail('T2 剧透标注', String(rawSum))
   const notice = await page.locator('.msg.ok').textContent().catch(() => null)
   notice?.includes('第 2 次尝试') ? ok('T2 回喂重试链路被真实走通（第 2 次成功）') : fail('T2 回喂提示', String(notice))
   const lvTitle = await page.locator('.lv-title').first().textContent()

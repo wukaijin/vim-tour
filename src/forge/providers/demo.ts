@@ -35,10 +35,20 @@ export function createDemoProvider(opts: DemoProviderOptions = {}): ForgeProvide
   return {
     id: 'demo',
     label: '离线演示',
-    async chat(): Promise<ChatResult> {
+    async chat(_messages, chatOpts): Promise<ChatResult> {
       calls += 1
       const bad = opts.failFirst === true && calls === 1
-      return { text: bad ? BAD_PAYLOAD : JSON.stringify(DEMO_DRAFT) }
+      const text = bad ? BAD_PAYLOAD : JSON.stringify(DEMO_DRAFT)
+      // 有增量消费者时模拟流式节奏：一段 thinking + 三片 output，让进度 UI 与走查有中间态可断言
+      if (chatOpts?.onDelta) {
+        chatOpts.onDelta({ kind: 'thinking', text: '演示模型正在出题' })
+        const third = Math.ceil(text.length / 3)
+        for (let i = 0; i < text.length; i += third) {
+          chatOpts.onDelta({ kind: 'output', text: text.slice(i, i + third) })
+          await new Promise((resolve) => setTimeout(resolve, 15))
+        }
+      }
+      return { text }
     },
   }
 }

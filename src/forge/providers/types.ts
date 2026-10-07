@@ -12,8 +12,18 @@ export interface ChatResult {
   usage?: ChatUsage
 }
 
+/** 流式增量种类：thinking = 推理段（各服务字段不一，尽力而为）；output = 正文段 */
+export type ChatDeltaKind = 'thinking' | 'output'
+
+export interface ChatDeltaEvent {
+  kind: ChatDeltaKind
+  text: string
+}
+
 export interface ChatOptions {
   signal?: AbortSignal
+  /** 流式增量回调（PLAN §14.7）：provider 尽力而为，不保证被调用（服务不理 stream 参数 / 演示降级时静默） */
+  onDelta?: (delta: ChatDeltaEvent) => void
 }
 
 /** provider 接口（PLAN §14.6）：OpenAI 兼容与离线演示都实现它 */
@@ -50,7 +60,7 @@ export interface ProviderConfig {
   baseUrl: string
   model: string
   apiKey?: string
-  /** 默认 120s：本地模型慢（PLAN §14.7） */
+  /** 默认 300s：本地模型慢（PLAN §14.7）。非流式 = 整请求总时长；流式 = 无新数据的空闲超时（每帧重置） */
   timeoutMs?: number
   /** response_format=json_object 的发送策略；auto = 先带，被 400/422 拒后去掉重试一次 */
   jsonMode?: 'auto' | 'on' | 'off'
