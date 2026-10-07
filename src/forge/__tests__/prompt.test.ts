@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { commandsUpTo } from '../../content/commands'
-import { appendRepair, buildDraftMessages, THEME_POOL } from '../prompt'
-import { DEFAULT_FORGE_PARAMS } from '../types'
+import { appendRepair, buildDraftMessages, DIFFICULTY_BRIEF, PATTERN_POOL, THEME_POOL } from '../prompt'
+import { rollTier } from '../types'
+import { DEFAULT_FORGE_PARAMS, FORGE_TIERS } from '../types'
 
 describe('buildDraftMessages', () => {
   it('按命令档列出可用命令（条数与 commandsUpTo 一致）', () => {
@@ -48,6 +49,50 @@ describe('buildDraftMessages', () => {
     const sys = buildDraftMessages(DEFAULT_FORGE_PARAMS)[0]!.content
     expect(sys).toContain('不要每次都出')
     expect(sys).toContain('["w","dw","<Esc>"]')
+  })
+
+  it('难度要求按复杂度档分化注入：不再全局压成「一两处编辑」', () => {
+    const sys = buildDraftMessages(DEFAULT_FORGE_PARAMS)[0]!.content
+    // 旧的「小而明确」全局限制已删——编辑规模交给分档的难度要求
+    expect(sys).not.toContain('一到两处编辑')
+    for (const difficulty of ['light', 'standard', 'hardcore'] as const) {
+      const user = buildDraftMessages({ ...DEFAULT_FORGE_PARAMS, difficulty })[1]!.content
+      expect(user).toContain(`难度要求：${DIFFICULTY_BRIEF[difficulty]}`)
+    }
+    // 硬核档的核心反例：不许用移动键凑按键数（治「长途跋涉改一个词」）
+    expect(DIFFICULTY_BRIEF.hardcore).toContain('凑按键数')
+    expect(DIFFICULTY_BRIEF.light).toContain('一两处小编辑')
+  })
+
+  it('题型方向注入：只从该命令档撑得起的原型里抽（minTier 过滤）', () => {
+    const tier1 = buildDraftMessages({ ...DEFAULT_FORGE_PARAMS, tier: 1 }, undefined, () => 0.999999)[1]!.content
+    const tier1Pool = PATTERN_POOL.filter((p) => p.minTier <= 1)
+    expect(tier1).toContain(`题型方向：${tier1Pool[tier1Pool.length - 1]!.text}`)
+    // 第 1 章抽不到高章原型（括号内改写是 ch4 的文本对象、搜索定位是 ch6 的）
+    expect(tier1).not.toContain('定界改写')
+    expect(tier1).not.toContain('查找定位')
+
+    const tier7 = buildDraftMessages({ ...DEFAULT_FORGE_PARAMS, tier: 7 }, undefined, () => 0)[1]!.content
+    expect(tier7).toContain(`题型方向：${PATTERN_POOL[0]!.text}`)
+    // 原型只描述结构，不剧透该用哪个命令（提示由引擎从解法推导）
+    for (const p of PATTERN_POOL) {
+      expect(p.text).not.toMatch(/ciw|:%s|\.\s|<C-v>/)
+    }
+  })
+})
+
+describe('rollTier（「随机」档解析）', () => {
+  it('具体档原样返回，不碰 rng', () => {
+    for (const t of FORGE_TIERS) expect(rollTier(t, () => 0.999999)).toBe(t)
+  })
+
+  it("'random' 落在 1–7 且注入 rng 可确定性", () => {
+    expect(rollTier('random', () => 0)).toBe(1)
+    expect(rollTier('random', () => 0.999999)).toBe(7)
+    for (const r of [0.05, 0.2, 0.4, 0.6, 0.8, 0.99]) {
+      const t = rollTier('random', () => r)
+      expect(FORGE_TIERS).toContain(t)
+    }
   })
 })
 

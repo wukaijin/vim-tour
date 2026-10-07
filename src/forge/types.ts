@@ -14,6 +14,20 @@ export type ForgeTier = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export const FORGE_TIERS: readonly ForgeTier[] = [1, 2, 3, 4, 5, 6, 7]
 
+/**
+ * 命令档的**设置值**：具体档（1–7）或「随机」。
+ * 哨兵只存在于设置层（forge-settings / 工坊 UI），生成链路的 ForgeParams 只见具体档
+ * ——「随机」在进入生成前就被 rollTier 解析掉，抽中的章自然进 provenance。
+ */
+export type ForgeTierSetting = ForgeTier | 'random'
+
+/** 「随机」档解析成具体章：具体档原样返回；rng 注入以便单测确定性 */
+export function rollTier(setting: ForgeTierSetting, rng: () => number = Math.random): ForgeTier {
+  if (setting !== 'random') return setting
+  const i = Math.min(FORGE_TIERS.length - 1, Math.max(0, Math.floor(rng() * FORGE_TIERS.length)))
+  return FORGE_TIERS[i]!
+}
+
 /** 复杂度档 → par（最优按键数）区间；硬核上界待求解器实测校准（PLAN §13） */
 export type ForgeDifficulty = 'light' | 'standard' | 'hardcore'
 

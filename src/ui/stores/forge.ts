@@ -8,11 +8,11 @@ import { createDemoProvider, DEMO_MODEL, DEMO_PARAMS } from '../../forge/provide
 import { createOpenAIProvider } from '../../forge/providers/openai'
 import { ForgeError, forgeErrorText } from '../../forge/providers/types'
 import type { ForgeProvider } from '../../forge/providers/types'
-import { DEFAULT_FORGE_PARAMS } from '../../forge/types'
+import { DEFAULT_FORGE_PARAMS, rollTier } from '../../forge/types'
 import type { ForgeParams, ProviderKind, SandboxLevel } from '../../forge/types'
 import { detectStorage } from '../../storage/progress'
 import { loadForgeSettings, saveForgeSettings } from '../../storage/forge-settings'
-import type { ForgeSettings } from '../../storage/forge-settings'
+import type { ForgeSettings, ForgeSettingsParams } from '../../storage/forge-settings'
 import { defaultSandboxRepository, parseSandboxExport, serializeSandboxExport, withFreshIds } from '../../storage/sandbox'
 
 /** 关卡工坊状态（PLAN §14）：生成台 / 沙盒库 / 模型与 key —— 与正篇进度零交集 */
@@ -30,7 +30,7 @@ export const useForgeStore = defineStore('forge', () => {
   }
   // 重载不丢设置：服务/地址/模型名与生成旋钮都从本机设置恢复（非机密，透明存）
   const initial = loadForgeSettings(storage, defaults)
-  const params = reactive<ForgeParams>({ ...initial.params })
+  const params = reactive<ForgeSettingsParams>({ ...initial.params })
   const providerKind = ref<ProviderKind>(initial.providerKind)
   const baseUrl = ref(initial.baseUrl)
   const model = ref(initial.model)
@@ -130,10 +130,12 @@ export const useForgeStore = defineStore('forge', () => {
     running.value = true
     attempt.value = 0
     try {
+      // 「随机」档进入生成链路前解析成具体章：核心层不见哨兵值，抽中的章进 provenance
+      const resolved: ForgeParams = { ...params, tier: rollTier(params.tier) }
       const out = await generateSandboxLevel({
         provider: wrapped,
         model: providerKind.value === 'demo' ? DEMO_MODEL : model.value,
-        params,
+        params: resolved,
         solve,
         makeId: () => `sbx-${crypto.randomUUID()}`,
         now: () => Date.now(),

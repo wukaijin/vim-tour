@@ -1,4 +1,4 @@
-import type { ForgeDifficulty, ForgeParams, ForgeTier, ProviderKind } from '../forge/types'
+import type { ForgeDifficulty, ForgeParams, ForgeTierSetting, ProviderKind } from '../forge/types'
 import type { StorageLike } from './progress'
 
 /**
@@ -7,11 +7,14 @@ import type { StorageLike } from './progress'
  */
 export const FORGE_SETTINGS_KEY = 'vim-tour:forge-settings'
 
+/** 设置层的生成旋钮：命令档允许「随机」（forge 核心的 ForgeParams 只收具体档，生成前解析） */
+export type ForgeSettingsParams = Omit<ForgeParams, 'tier'> & { tier: ForgeTierSetting }
+
 export interface ForgeSettings {
   providerKind: ProviderKind
   baseUrl: string
   model: string
-  params: ForgeParams
+  params: ForgeSettingsParams
 }
 
 const TIERS: readonly number[] = [1, 2, 3, 4, 5, 6, 7]
@@ -40,7 +43,7 @@ export function loadForgeSettings(storage: StorageLike, defaults: ForgeSettings)
     baseUrl: str(r.baseUrl, 200) ?? defaults.baseUrl,
     model: str(r.model, 100) ?? defaults.model,
     params: {
-      tier: TIERS.includes(p.tier as number) ? (p.tier as ForgeTier) : defaults.params.tier,
+      tier: p.tier === 'random' || TIERS.includes(p.tier as number) ? (p.tier as ForgeTierSetting) : defaults.params.tier,
       difficulty: DIFFICULTIES.includes(p.difficulty as string)
         ? (p.difficulty as ForgeDifficulty)
         : defaults.params.difficulty,

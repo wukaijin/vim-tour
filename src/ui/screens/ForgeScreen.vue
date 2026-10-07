@@ -57,6 +57,7 @@ function onImportFile(e: Event): void {
           <span>命令档</span>
           <select v-model.number="forge.params.tier">
             <option v-for="t in FORGE_TIERS" :key="t" :value="t">第 {{ t }} 章</option>
+            <option value="random">随机（每次生成抽一章）</option>
           </select>
         </label>
         <label class="knob">

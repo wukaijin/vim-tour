@@ -34,6 +34,12 @@ describe('forge 设置持久化（非机密配置）', () => {
     expect(loadForgeSettings(storage, defaults)).toEqual(custom)
   })
 
+  it('「随机」命令档是合法设置值，round trip 不丢', () => {
+    const storage = memStorage()
+    saveForgeSettings(storage, { ...custom, params: { ...custom.params, tier: 'random' } })
+    expect(loadForgeSettings(storage, defaults).params.tier).toBe('random')
+  })
+
   it('只存非机密字段：不含 key/口令', () => {
     const storage = memStorage()
     saveForgeSettings(storage, custom)

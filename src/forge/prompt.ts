@@ -1,7 +1,7 @@
 import { commandsUpTo } from '../content/commands'
 import type { CommandMeta } from '../content/commands'
 import { DIFFICULTY_LABEL, PAR_RANGE } from './types'
-import type { ChatMessage, ForgeParams } from './types'
+import type { ChatMessage, ForgeDifficulty, ForgeParams, ForgeTier } from './types'
 
 export type { ChatMessage }
 
@@ -18,9 +18,38 @@ const SYSTEM_PROMPT = `你是 vim 教学游戏的出题人。你负责编一道�
 
 质量要求：
 - 题目要像真实编辑场景，brief 用一句话说清任务。
-- 修改要小而明确：一到两处编辑，不要大段重写。
+- 编辑的规模与题目结构按本次给出的「难度要求」「题型方向」来，不要自作主张缩小。
 - 题材与文本结构要有变化：**不要每次都出「改配置里的端口/数值」这类题**；给出的题材若不好写，可以换成别的真实场景。
 - cursor 是初始光标位置（line / col 从 0 起），请让起点合理：不要恰好停在要改的位置上，也别远到无聊。`
+
+/**
+ * 难度要求（按复杂度档分化注入 user 消息）：按键数区间只管解的长度，
+ * 「难」得体现在解法的发现上——聪明解法明显短于笨办法，而不是移动键凑数。
+ */
+export const DIFFICULTY_BRIEF: Record<ForgeDifficulty, string> = {
+  light: '一两处小编辑、改完就走；起点离目标不远，不要拉长光标路程凑按键数。',
+  standard: '两到三处编辑，或一处需要组合移动才能精确定位的修改；最好让聪明的解法明显短于笨办法。',
+  hardcore:
+    '难度要体现在解法的发现上，不是移动键的数量：制造「聪明解法明显短于笨办法」的结构——分散的多处同类编辑、长距离调度、能整块处理的内容；绝不要用一串移动键把光标挪过去只改一个词来凑按键数。',
+}
+
+/**
+ * 题型原型池：题材池管「写什么」，这里管「怎么个改法」——给结构方向，防模型
+ * 永远出「走到位置改个词」。minTier = 该原型需要的命令至少教到第几章才成立
+ * （文本对象 ch4、块操作 ch5、搜索替换 ch6）。文案只描述结构不点破命令：
+ * 提示由引擎从解法推导，出题人也不该剧透解法。
+ */
+export const PATTERN_POOL: readonly { minTier: ForgeTier; text: string }[] = [
+  { minTier: 1, text: '多处同类小改：同一个模式在文本里反复出现，任务要把它们全部改掉或删掉' },
+  { minTier: 1, text: '行序调整：把某行挪到别处，或复制一行到新位置（删行与粘贴的往返）' },
+  { minTier: 2, text: '远距离调度：要改的位置在文本另一头，起点故意放远' },
+  { minTier: 3, text: '合并与拆分：几行内容要并成一行，或一行要拆成几行' },
+  { minTier: 3, text: '成段删除：一段连续内容整体消失，边界要找得准' },
+  { minTier: 4, text: '定界改写：要改的内容被括号、引号或标签包着，只动里面、边界原样保留' },
+  { minTier: 5, text: '列的批量活：多行在同一个列位置要一起加点东西或一起删掉' },
+  { minTier: 6, text: '查找定位：目标词在文本里多处出现，得先跳到对的那处再动手' },
+  { minTier: 6, text: '批量换名：整个文本范围内把一个词统一换成另一个词' },
+]
 
 /**
  * 内置题材池：玩家没填题材时随机抽一个——否则模型每道题都会落在它自己的最爱
@@ -65,6 +94,9 @@ export function buildDraftMessages(
   const themeLine = typed
     ? `题材：${typed}`
     : `题材：${rolled}（若不好写可换成别的真实场景，但避免总出「改配置里的端口/数值」这类）`
+  // 题型方向：先按命令档过滤出该档命令撑得起的原型，再随机抽一个（rng 注入以便单测）
+  const tierPatterns = PATTERN_POOL.filter((p) => params.tier >= p.minTier)
+  const pattern = tierPatterns[Math.min(tierPatterns.length - 1, Math.max(0, Math.floor(rng() * tierPatterns.length)))]!
   const user = [
     '请出一道 vim 练习关卡。',
     '',
@@ -72,6 +104,8 @@ export function buildDraftMessages(
     allowed,
     '',
     `难度：${DIFFICULTY_LABEL[params.difficulty]}——最优解法大约需要 ${range.min}–${range.max} 次按键。`,
+    `难度要求：${DIFFICULTY_BRIEF[params.difficulty]}`,
+    `题型方向：${pattern.text}（与题材叠加考虑；确实不好写可换别的结构，但不要降低难度要求）`,
     `规模：最多 ${params.maxLines} 行、每行不超过 ${params.maxCols} 个字符。`,
     themeLine,
     '',
