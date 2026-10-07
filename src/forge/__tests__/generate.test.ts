@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isTaughtSeq } from '../../content/commands'
+import { commandById, isTaughtSeq, seqsOf } from '../../content/commands'
 import { LevelRun } from '../../game/runtime'
 import { parseKeys } from '../../engine'
 import { solve } from '../../engine/solver'
@@ -7,7 +7,14 @@ import { createDemoProvider, DEMO_DRAFT } from '../providers/demo'
 import { ForgeError } from '../providers/types'
 import type { ChatMessage, ForgeProvider } from '../providers/types'
 import { generateSandboxLevel } from '../generate'
-import { makeSandboxLevel, sandboxHints, solutionSummary, taughtKeysFor, verifySandboxLevel } from '../level'
+import {
+  makeSandboxLevel,
+  replayKeysFor,
+  sandboxHints,
+  solutionSummary,
+  taughtKeysFor,
+  verifySandboxLevel,
+} from '../level'
 import type { Solver } from '../level'
 import { DEFAULT_FORGE_PARAMS, toParKeys } from '../types'
 import type { SandboxLevel } from '../types'
@@ -69,6 +76,97 @@ describe('taughtKeysFor（命令档 → 玩家白名单）', () => {
     expect(taughtKeysFor(2)).not.toContain('2dd')
     expect(taughtKeysFor(5)).toContain('V')
     expect(taughtKeysFor(2)).not.toContain('V')
+  })
+})
+
+describe('计数形态白名单（count 尾集与 KeyFilter 锚点对齐）', () => {
+  // target 与 start 永远不会一致，避免探针键误触 rep-success
+  const text = {
+    start: ['alpha beta', 'gamma delta', 'eps zeta', 'eta theta'],
+    target: ['done'],
+    cursor: { line: 0, col: 0 },
+    parKeys: 'x',
+  }
+  // 锚点清单直接取 count 命令的 seqs（尾集单源派生）：尾集扩了测试自动跟上
+  const forms = [...seqsOf(commandById('count')), '8gg', '10dd']
+
+  it('tier≥3：count 已教，全部计数形态放行（实犯回归：2yy/8gg 曾弹「还没教到」）', () => {
+    for (const tier of [3, 5, 7] as const) {
+      for (const form of forms) {
+        const run = new LevelRun(text, taughtKeysFor(tier))
+        for (const key of parseKeys(form)) {
+          const out = run.feed(key)
+          if (out.kind === 'untaught') throw new Error(`tier=${tier} 按 ${form} 时 ${JSON.stringify(key)} 被拦`)
+        }
+      }
+    }
+  })
+
+  it('tier≤2：count 未教，计数形态仍被拦（教学边界不动）', () => {
+    for (const form of ['2yy', '3gg', 'd2w']) {
+      const run = new LevelRun(text, taughtKeysFor(2))
+      const untaught = parseKeys(form).some((key) => run.feed(key).kind === 'untaught')
+      expect(untaught, `tier=2 按 ${form} 应被拦`).toBe(true)
+    }
+  })
+})
+
+describe('replayKeysFor（重放白名单按 tier 现算：库里快照会随命令表演进过期）', () => {
+  const text = {
+    start: ['alpha beta', 'gamma delta', 'eps zeta', 'eta theta'],
+    target: ['done'],
+    cursor: { line: 0, col: 0 },
+    parKeys: 'x',
+  }
+  const make = (allowedKeys: string[], solverKeys: string[]): SandboxLevel =>
+    makeSandboxLevel({
+      id: 'sbx-replay-test',
+      draft: {
+        title: '回放',
+        brief: '计数锚点',
+        start: text.start,
+        target: text.target,
+        cursor: text.cursor,
+        commands: solverKeys,
+        parKeys: 'x',
+      },
+      grid: true,
+      allowedKeys,
+      solverKeys,
+      parKeys: 'x',
+      parSource: 'verified',
+      params: params({ tier: 7 }),
+      model: 'test',
+      createdAt: 0,
+    })
+
+  it('旧库快照缺计数锚点：重放白名单现算补齐（实犯：旧版生成的关按 2yy/8gg 被拦）', () => {
+    // 复刻旧版快照：数字段样本全部缺失（比用户库里的实况更极端，结论同向）
+    const stale = taughtKeysFor(7).filter((k) => !/^[1-9]/.test(k) && k !== 'd2w')
+    const lv = make(stale, ['j', 'dd', '2dd', 'P', '<Esc>'])
+    // 快照本身确实拦——这正是要靠现算修掉的
+    const staleRun = new LevelRun(lv.text, lv.allowedKeys)
+    expect(parseKeys('2yy').some((k) => staleRun.feed(k).kind === 'untaught')).toBe(true)
+    // 重放白名单放行
+    const run = new LevelRun(lv.text, replayKeysFor(lv))
+    for (const form of ['2yy', '8gg']) {
+      for (const key of parseKeys(form)) {
+        expect(run.feed(key).kind, `按 ${form}`).not.toBe('untaught')
+      }
+    }
+  })
+
+  it('声明集并入重放白名单：模型声明的 7gg（pattern 放行、trie 需样本锚）要能按', () => {
+    const lv = make(taughtKeysFor(7), ['7gg', '<Esc>'])
+    expect(replayKeysFor(lv)).toContain('7gg')
+    const run = new LevelRun(lv.text, replayKeysFor(lv))
+    for (const key of parseKeys('7gg')) expect(run.feed(key).kind).not.toBe('untaught')
+  })
+
+  it('无 solverKeys 的旧数据：回退 allowedKeys 当声明集，不丢声明键', () => {
+    const lv = make(['j', 'dd', 'P'], [])
+    const keys = replayKeysFor({ ...lv, solverKeys: [] })
+    for (const k of ['j', 'dd', 'P', '<Esc>', '2yy']) expect(keys).toContain(k)
   })
 })
 

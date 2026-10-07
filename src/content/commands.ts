@@ -21,6 +21,13 @@ export interface CommandMeta {
   chapter: number
 }
 
+/**
+ * count 可用形态的命令尾（前置计数，如 2dd 的 dd）：单点定义，两处派生——
+ * seqs 样本锚 KeyFilter 的 count 通配边（玩家可按），pattern 供 isTaughtSeq 校验（闸门可声明）。
+ * 两口径曾分叉实犯：pattern 收了尾集而 trie 没锚点，3gg/2yy 被弹「还没教到」——改尾集只改这里。
+ */
+const COUNT_TAILS = ['dd', 'dw', 'de', 'cw', 'cc', 'yy', 'yw', 'j', 'k', 'w', 'b', 'e', 'x', 'gg', 'G', 'J'] as const
+
 export const COMMANDS: CommandMeta[] = [
   // ========== 第 1 章 · 生存 ==========
   {
@@ -322,12 +329,12 @@ export const COMMANDS: CommandMeta[] = [
   {
     id: 'count',
     keys: '2dd',
-    // 两个形态样本（前缀/中缀）；KeyFilter 把数字段通配为任意 [1-9][0-9]*，样本只锚形态不锚数值
-    seqs: ['2dd', 'd2w'],
+    // 样本锚形态不锚数值（KeyFilter 把数字段通配为任意 [1-9][0-9]*）：前置逐尾一条 + 中缀 d2w
+    seqs: [...new Set(['d2w', ...COUNT_TAILS.map((t) => `2${t}`)])],
     mode: 'normal',
     desc: '计数前缀：数字放在命令前让它重复 n 次——2dd 删两行、3w 跳三个词、d2w 删两个词。',
     example: { keys: '2dd', effect: '一次删掉两行' },
-    pattern: /^[1-9][0-9]*(?:dd|dw|de|cw|cc|yy|yw|j|k|w|b|e|x|gg|G|J)$/,
+    pattern: new RegExp(`^[1-9][0-9]*(?:${COUNT_TAILS.join('|')})$`),
     chapter: 3,
   },
   {

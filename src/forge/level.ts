@@ -19,19 +19,12 @@ export type SolverOutcome = { ok: true; keys: Key[] } | { ok: false; reason: 'bu
 export type Solver = (input: SolverInput) => SolverOutcome
 
 /**
- * 计数形态样本（tier≥3 即 count 已教）：每个形态一条样本锚定 trie 路径，
- * 数字段本身由 KeyFilter 通配为任意 [1-9][0-9]*（2dd 同时放行 3dd/10dd）。
- */
-const COUNT_SEQS = ['2dd', '2w', '2b', '2e', '2j', '2k', '2yy', '2dw', '2cw', '2x']
-
-/**
- * 命令档 → 玩家白名单（PLAN §14.1）：该档全部已教命令。
+ * 命令档 → 玩家白名单（PLAN §14.1）：该档全部已教命令——计数形态样本由 count 命令的
+ * seqs 单源带出（尾集定义在 commands.ts，样本锚 KeyFilter 的 count 通配边）。
  * 玩家在沙盒里能按「截至本章学过的一切」（选第 5 章就能按 j），与正篇 ch5+ 放开的姿态一致。
  */
 export function taughtKeysFor(tier: ForgeTier): string[] {
-  const base = keysOf(commandsUpTo(tier).map((c) => c.id))
-  const extra = tier >= 3 ? COUNT_SEQS : []
-  return [...new Set([...base, ...extra])].filter((seq) => isTaughtSeq(seq, tier))
+  return keysOf(commandsUpTo(tier).map((c) => c.id))
 }
 
 /**
@@ -51,6 +44,17 @@ export function keysFromDeclared(
   const solverKeys = [...new Set([...declared, '<Esc>'])] // Esc 是打字收尾必备
   const playKeys = [...new Set([...taughtKeysFor(tier), ...solverKeys])]
   return { ok: true, playKeys, solverKeys }
+}
+
+/**
+ * 重放白名单（PLAN §14.4）：库里存的 allowedKeys 是生成期快照，命令表演进后快照会缺新
+ * 锚点（实犯：旧版生成的关按 2yy/8gg 被拦）——重放一律按 tier 现算，与 keysFromDeclared
+ * 同式；快照只作导入校验，旧数据无 solverKeys 时回退它当声明集。
+ */
+export function replayKeysFor(level: SandboxLevel): string[] {
+  const declared =
+    level.solverKeys.length > 0 ? level.solverKeys : [...new Set([...level.allowedKeys, '<Esc>'])]
+  return [...new Set([...taughtKeysFor(level.provenance.tier), ...declared])]
 }
 
 /**
@@ -228,7 +232,7 @@ export function parRangeOf(params: ForgeParams): { min: number; max: number } {
   return PAR_RANGE[params.difficulty]
 }
 
-/** 沙盒关的 Level 形状视图（PlayScreen 复用）：提示由解推导、单变体、无教学卡 */
+/** 沙盒关的 Level 形状视图（PlayScreen 复用）：提示由解推导、单变体、无教学卡；白名单重放现算 */
 export function sandboxLevelView(level: SandboxLevel): Level {
   return {
     id: level.id,
@@ -236,7 +240,7 @@ export function sandboxLevelView(level: SandboxLevel): Level {
     title: level.title,
     brief: level.brief,
     hints: sandboxHints(level.text, level.provenance.tier),
-    allowedKeys: level.allowedKeys,
+    allowedKeys: replayKeysFor(level),
     grid: level.grid,
     teaches: [],
     texts: [level.text],

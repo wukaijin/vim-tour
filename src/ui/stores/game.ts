@@ -13,7 +13,7 @@ import { dismissWarmupToday, isWarmupDismissed, selectWarmup } from '../../game/
 import type { Level, LevelRecord, Stars } from '../../game/types'
 import { detectStorage } from '../../storage/progress'
 import { defaultSandboxRepository } from '../../storage/sandbox'
-import { applySandboxConcede, applySandboxResult, sandboxLevelView } from '../../forge/level'
+import { applySandboxConcede, applySandboxResult, replayKeysFor, sandboxLevelView } from '../../forge/level'
 import type { SandboxLevel, SandboxStats } from '../../forge/types'
 import { markCardSeen, seenCard } from '../../storage/flags'
 import { useProgressStore } from './progress'
@@ -149,7 +149,8 @@ export const useGameStore = defineStore('game', () => {
       kind: 'sandbox',
       level: sandboxLevelView(sbx),
       sandbox: sbx,
-      run: new LevelRun(sbx.text, sbx.allowedKeys),
+      // 白名单按 tier 现算：库里的快照会随命令表演进缺锚点（旧关按 2yy 被拦的实犯）
+      run: new LevelRun(sbx.text, replayKeysFor(sbx)),
     }
     cardVisible.value = false
     hintStage.value = 0
@@ -270,7 +271,7 @@ export const useGameStore = defineStore('game', () => {
         sandbox.put({ ...a.sandbox, stats: applySandboxConcede(a.sandbox.stats) })
       }
       const fresh = sandbox.get(a.sandbox.id)
-      if (fresh) active.value = { kind: 'sandbox', level: a.level, sandbox: fresh, run: new LevelRun(fresh.text, fresh.allowedKeys) }
+      if (fresh) active.value = { kind: 'sandbox', level: a.level, sandbox: fresh, run: new LevelRun(fresh.text, replayKeysFor(fresh)) }
       rev.value++
       recentKeys.value = []
     }

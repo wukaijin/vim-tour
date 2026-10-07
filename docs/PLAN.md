@@ -299,7 +299,7 @@ src/
 - 纯 TS 零依赖；执行放 Web Worker，可取消。
 
 ### 14.4 沙盒库与进出（独立命名空间）
-- `vim-tour:sandbox` 独立 localStorage key，自持 `schemaVersion` / sanitize / 条数上限；条目 = 关卡数据（与 `Level` 同形，单变体）+ provenance（模型名/旋钮/生成时间）+ 单关成绩（bestStars/bestKeys/attempts）。**与进度仓库零字段共享**：不写 `LevelRecord`、不进锈蚀/热身/解锁。条目同时存 `allowedKeys`（玩家白名单，档位给全）与 `solverKeys`（求解器字母表，缺省回退为前者）。
+- `vim-tour:sandbox` 独立 localStorage key，自持 `schemaVersion` / sanitize / 条数上限；条目 = 关卡数据（与 `Level` 同形，单变体）+ provenance（模型名/旋钮/生成时间）+ 单关成绩（bestStars/bestKeys/attempts）。**与进度仓库零字段共享**：不写 `LevelRecord`、不进锈蚀/热身/解锁。条目同时存 `allowedKeys`（玩家白名单的生成期快照，仅作导入校验与旧数据回退）与 `solverKeys`（求解器字母表，缺省回退为前者）。**重放白名单不读快照、按 `provenance.tier` 现算**（∪ solverKeys，与 §14.1 双白名单同式）——命令表演进自动惠及旧库关卡（2026-10-08 实犯：旧快照缺 `2yy`/`2gg` 计数锚点，玩家按 `2yy`/`8gg` 被「还没教到」拦下；同日另一修：count 尾集（commands.ts `COUNT_TAILS` 单点定义）此前 seqs 样本与 pattern 校验分叉——pattern 声称已教、trie 无锚点）。
 - 导出/导入 JSON（可分享、可备份）：导出**不含任何 key 与配置**；**导入即不可信**——解析 → 结构校验 → 求解器复算 par，不信文件中的 par。
 
 ### 14.5 判定与反馈边界

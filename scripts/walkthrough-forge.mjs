@@ -159,6 +159,16 @@ const run = async () => {
     ? ok('T4 未教的键仍被拦（文案准确）')
     : fail('T4 未教键', JSON.stringify(toastText))
   await page.keyboard.press('h') // 复位到 col 0
+  // 计数形态（实犯回归：旧版白名单缺锚点，2yy/8gg 弹「还没教到」）——count 尾集样本必须锚进 trie
+  await page.waitForTimeout(1700) // 等 V 的 toast（1600ms 自动消失）清场，别把旧 toast 误判成新拦截
+  await press(page, '2cc') // cc 是 count 尾集之一：2 计数 + cc 清行进插入模式，改写可见
+  await page.waitForTimeout(250)
+  const ccToast = await page.locator('.toast').count()
+  const ccLine = await page.locator('.editor .buffer .line .text').first().innerText()
+  ccToast === 0 && !ccLine.includes('3000')
+    ? ok('T4 计数形态可按（2cc 清行，无「还没教到」）')
+    : fail('T4 计数形态', `toast=${ccToast} line=${ccLine}`)
+  await page.keyboard.press('Escape') // 退出 cc 留下的插入模式
   await page.getByRole('button', { name: '重来' }).click() // 清掉探针按键，按 par 解通关（≤par 才三星）
   await page.waitForTimeout(200)
   await shot(page, 't52-forge-play')
