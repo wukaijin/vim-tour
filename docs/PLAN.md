@@ -315,7 +315,7 @@ src/
 
 ### 14.7 生成 UX
 显式「生成」按钮 + 可见进度 + **可取消**；超时默认 300s（本地模型慢，可配）；失败分类文案（网络 / 鉴权 / 限流 / 响应不可解析 / 未收敛 / 求解超预算）；回喂重试可见「第 n 次尝试」；响应带 usage 时显示 token 用量。
-- **生成走 SSE 流式**（`stream: true`，fetch ReadableStream 手写解析，零依赖）：UI **尽力而为**展示「思考中 / 生成中」状态行与字数——thinking 字段无行业标准（DeepSeek 系 `reasoning_content`、OpenRouter `reasoning`、Ollama `thinking`），多字段尝试，取不到不显示、不作机制依赖；服务不理 stream 参数回整包 JSON 时按 content-type 嗅探降级非流式。流式下超时语义 = 无新数据的**空闲超时**（每帧重置，同一 timeoutMs），非流式仍为整请求总时长。
+- **生成走 SSE 流式**（`stream: true`，fetch ReadableStream 手写解析，零依赖）：UI **尽力而为**展示「思考中 / 生成中」状态行与字数——thinking 字段无行业标准（DeepSeek 系 `reasoning_content`、OpenRouter `reasoning`、Ollama `thinking`），多字段尝试，取不到不显示、不作机制依赖）；**正文承载位置同样多字段尝试**（`delta.content` → `choices[0].message.content` → `choices[0].text`，首个出现者锁定——防「delta 增量 + 尾帧 message 汇总」双计），流里塞 `{"error":{…}}` 帧时透出服务给的真实原因；服务不理 stream 参数回整包 JSON 时按 content-type 嗅探降级非流式。流式下超时语义 = 无新数据的**空闲超时**（每帧重置，同一 timeoutMs），非流式仍为整请求总时长。
 - **原始输出折叠并标注剧透**：thinking 在推导解法、output 即含 parKeys 的题目 JSON，原文直出等于剧透答案——状态行只给进度感，原文进默认折叠的调试块（生成失败时留在页面上便于排查连接）。
 - **模型设置折叠为生成台内的次级区块**（`<details>`，默认收起）：默认服务是离线演示，多数人不需要改连接与 key；三张卡压成两张，一屏装得下。折叠标题行**必须自报当前服务**（provider + 模型 + 地址），不展开也知道在用哪个。
 - **原生控件必须装修**：`select` 去平台默认外观与箭头（`appearance: none` + CSS 画 chevron，零资源），底色与输入框统一；数字输入走 `IBM Plex Mono`（Nunito 的 1/7 与 0/8 难分辨，而这里恰是要盯着改的数字）；字段用定宽栅格而非裸 flex（裸排时字段宽度与内容语义零关联，读起来像没排版）。

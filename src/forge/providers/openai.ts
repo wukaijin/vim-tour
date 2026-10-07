@@ -115,6 +115,9 @@ async function readSseChat(
   let buf = ''
   let content = ''
   let usage: ChatUsage | undefined
+  // 正文承载位置不一定在 delta.content（部分兼容层/legacy 网关用 message.content 或 completions 式 text）；
+  // 首个出现正文的字段一经出现即锁定——防「delta 增量 + 尾帧 message 汇总」双计
+  let contentField: 'delta' | 'message' | 'text' | null = null
   const handleLine = (line: string): void => {
     if (!line.startsWith('data:')) return // event:/id:/冒号注释行忽略
     const payload = line.slice(5).replace(/^ /, '')
@@ -125,13 +128,30 @@ async function readSseChat(
     } catch {
       return // 坏帧跳过，不毒化整次响应
     }
-    const delta = (obj as { choices?: Array<{ delta?: Record<string, unknown> }> }).choices?.[0]?.delta
-    if (delta) {
-      const think = firstString(delta.reasoning_content, delta.reasoning, delta.thinking)
-      if (think !== undefined) onDelta({ kind: 'thinking', text: think })
-      if (typeof delta.content === 'string' && delta.content.length > 0) {
-        content += delta.content
-        onDelta({ kind: 'output', text: delta.content })
+    const o = obj as {
+      choices?: Array<{ delta?: Record<string, unknown>; message?: { content?: unknown }; text?: unknown }>
+      error?: { message?: unknown }
+    }
+    // 部分服务出错不开 4xx：200 开流后在帧里塞 {"error":{…}}——透出真实原因，别落到「没有内容增量」
+    if (o.error) throw new ForgeError('bad-response', firstString(o.error.message) ?? '服务在流式响应里报了错')
+    const choice = o.choices?.[0]
+    if (choice) {
+      const delta = choice.delta
+      if (delta) {
+        const think = firstString(delta.reasoning_content, delta.reasoning, delta.thinking)
+        if (think !== undefined) onDelta({ kind: 'thinking', text: think })
+      }
+      let out: string | undefined
+      if (contentField === 'delta') out = firstString(delta?.content)
+      else if (contentField === 'message') out = firstString(choice.message?.content)
+      else if (contentField === 'text') out = firstString(choice.text)
+      else {
+        out = firstString(delta?.content) ?? firstString(choice.message?.content) ?? firstString(choice.text)
+        if (out !== undefined) contentField = delta?.content !== undefined ? 'delta' : choice.message?.content !== undefined ? 'message' : 'text'
+      }
+      if (out !== undefined) {
+        content += out
+        onDelta({ kind: 'output', text: out })
       }
     }
     const u = usageOf(obj)

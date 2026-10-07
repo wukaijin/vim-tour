@@ -241,6 +241,49 @@ describe('createOpenAIProvider（SSE 流式）', () => {
     })
     await expect(p.chat([], { onDelta: () => {} })).rejects.toMatchObject({ kind: 'bad-response' })
   })
+
+  it('正文承载不在 delta.content：message.content / text 形状都能累积', async () => {
+    const mk = (chunks: string[]) =>
+      createOpenAIProvider(cfg(), { fetchImpl: (async () => sseResponse(chunks)) as unknown as typeof fetch })
+    const msgStyle = await mk([
+      frame({ choices: [{ message: { content: '{"b":' } }] }),
+      frame({ choices: [{ message: { content: '2}' } }] }),
+      DONE,
+    ]).chat([], { onDelta: () => {} })
+    expect(msgStyle.text).toBe('{"b":2}')
+    const textStyle = await mk([
+      frame({ choices: [{ text: '{"c":' }] }), // legacy completions 式
+      frame({ choices: [{ text: '3}' }] }),
+      DONE,
+    ]).chat([], { onDelta: () => {} })
+    expect(textStyle.text).toBe('{"c":3}')
+  })
+
+  it('正文字段一经出现即锁定：尾帧 message 汇总不与 delta 增量双计', async () => {
+    const deltas: ChatDeltaEvent[] = []
+    const p = createOpenAIProvider(cfg(), {
+      fetchImpl: (async () =>
+        sseResponse([
+          frame({ choices: [{ delta: { role: 'assistant', content: '' } }] }), // 空串 role 首帧即锁定 delta
+          contentFrame('{"d":4}'),
+          frame({ choices: [{ message: { content: '{"d":4}' } }] }), // 汇总帧，应被忽略
+          DONE,
+        ])) as unknown as typeof fetch,
+    })
+    const r = await p.chat([], { onDelta: (d) => deltas.push(d) })
+    expect(r.text).toBe('{"d":4}')
+    expect(deltas.filter((d) => d.kind === 'output')).toHaveLength(1)
+  })
+
+  it('error 帧（200 开流后塞 {"error":{…}}）→ bad-response 且透出服务给的原因', async () => {
+    const p = createOpenAIProvider(cfg(), {
+      fetchImpl: (async () =>
+        sseResponse([frame({ error: { message: 'model not found: qwen99', code: 404 } }), DONE])) as unknown as typeof fetch,
+    })
+    const err = await p.chat([], { onDelta: () => {} }).catch((e: unknown) => e)
+    expect(err).toMatchObject({ kind: 'bad-response' })
+    expect((err as Error).message).toContain('model not found')
+  })
 })
 
 describe('createDemoProvider（离线演示）', () => {
