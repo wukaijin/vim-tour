@@ -17,6 +17,7 @@ const defaults: ForgeSettings = {
   providerKind: 'demo',
   baseUrl: 'http://localhost:11434/v1',
   model: '',
+  maxTokens: 65_536,
   params: { tier: 3, difficulty: 'standard', maxLines: 4, maxCols: 40, theme: '' },
 }
 
@@ -24,6 +25,7 @@ const custom: ForgeSettings = {
   providerKind: 'openai',
   baseUrl: 'http://127.0.0.1:11434/v1',
   model: 'qwen2.5-coder:7b',
+  maxTokens: 8192,
   params: { tier: 6, difficulty: 'hardcore', maxLines: 6, maxCols: 56, theme: '日志排查' },
 }
 
@@ -46,7 +48,7 @@ describe('forge 设置持久化（非机密配置）', () => {
     const raw = storage.dump().get(FORGE_SETTINGS_KEY)!
     expect(raw).not.toContain('apiKey')
     expect(raw).not.toContain('passphrase')
-    expect(Object.keys(JSON.parse(raw)).sort()).toEqual(['baseUrl', 'model', 'params', 'providerKind'])
+    expect(Object.keys(JSON.parse(raw)).sort()).toEqual(['baseUrl', 'maxTokens', 'model', 'params', 'providerKind'])
   })
 
   it('缺失 / 损坏 / 非对象 → 回到默认值', () => {
@@ -69,7 +71,17 @@ describe('forge 设置持久化（非机密配置）', () => {
     expect(got.providerKind).toBe('demo')
     expect(got.baseUrl).toBe(defaults.baseUrl)
     expect(got.model).toBe('')
-    expect(got.params).toEqual({ tier: 3, difficulty: 'standard', maxLines: 8, maxCols: 16, theme: '' })
+    expect(got.params).toEqual({ tier: 3, difficulty: 'standard', maxLines: 20, maxCols: 16, theme: '' })
+  })
+
+  it('输出上限收敛：0（不限制）合法；负数归 0、越上限钳 100 万、非数回默认', () => {
+    const mk = (maxTokens: unknown) =>
+      memStorage({ [FORGE_SETTINGS_KEY]: JSON.stringify({ ...custom, maxTokens }) })
+    expect(loadForgeSettings(mk(0), defaults).maxTokens).toBe(0)
+    expect(loadForgeSettings(mk(-5), defaults).maxTokens).toBe(0)
+    expect(loadForgeSettings(mk(999_999), defaults).maxTokens).toBe(999_999)
+    expect(loadForgeSettings(mk(2_000_000), defaults).maxTokens).toBe(1_000_000)
+    expect(loadForgeSettings(mk('65536'), defaults).maxTokens).toBe(defaults.maxTokens)
   })
 
   it('读返回的是副本：改它不污染 defaults', () => {

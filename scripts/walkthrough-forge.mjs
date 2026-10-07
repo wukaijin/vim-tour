@@ -208,6 +208,9 @@ const run = async () => {
   await page.getByPlaceholder('http://localhost:11434/v1').fill('http://127.0.0.1:11434/v1')
   await page.getByPlaceholder('qwen2.5-coder:7b').fill('my-test-model')
   await page.getByPlaceholder('例如：nginx 配置、日志排查').fill('日志排查')
+  // 输出上限（max_tokens）也是非机密设置：改值重载要恢复
+  const maxTokInput = page.locator('.knobs.model input[type="number"]')
+  await maxTokInput.fill('8192')
   await page.waitForTimeout(250)
   await page.reload()
   await page.waitForSelector('.forge', { timeout: 8000 })
@@ -217,12 +220,14 @@ const run = async () => {
   const urlAfter = await page.getByPlaceholder('http://localhost:11434/v1').inputValue()
   const modelAfter = await page.getByPlaceholder('qwen2.5-coder:7b').inputValue()
   const themeAfter = await page.getByPlaceholder('例如：nginx 配置、日志排查').inputValue()
+  const maxTokAfter = await maxTokInput.inputValue()
   providerAfter === 'openai' &&
   urlAfter === 'http://127.0.0.1:11434/v1' &&
   modelAfter === 'my-test-model' &&
-  themeAfter === '日志排查'
-    ? ok('T7 模型设置与生成旋钮重载后不丢')
-    : fail('T7 设置持久化', `${providerAfter}|${urlAfter}|${modelAfter}|${themeAfter}`)
+  themeAfter === '日志排查' &&
+  maxTokAfter === '8192'
+    ? ok('T7 模型设置与生成旋钮重载后不丢（含输出上限）')
+    : fail('T7 设置持久化', `${providerAfter}|${urlAfter}|${modelAfter}|${themeAfter}|${maxTokAfter}`)
   await shot(page, 't55-forge-settings-persist')
 
   // —— T8 锁定态解锁：已存 key 重载后口令行常驻，不挂在「记住」勾选下 ——

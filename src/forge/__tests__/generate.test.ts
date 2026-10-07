@@ -15,6 +15,16 @@ import type { SandboxLevel } from '../types'
 const solverWith = (n: number): Solver => () => ({ ok: true, keys: Array.from({ length: n }, () => 'x') })
 const solverFail = (reason: 'budget' | 'unsolvable'): Solver => () => ({ ok: false, reason })
 
+/** 任意行数的候选 JSON（行数超限会被 parseDraft 拒，用于锁核心层钳制） */
+const stubProvider = (lines: number): ForgeProvider => ({
+  id: 'stub',
+  label: '桩',
+  async chat() {
+    const rows = Array.from({ length: lines }, (_, i) => `line ${i}`)
+    return { text: JSON.stringify({ ...DEMO_DRAFT, start: rows, target: rows.map((l, i) => (i === 0 ? 'LINE 0' : l)) }) }
+  },
+})
+
 const params = (over: Partial<typeof DEFAULT_FORGE_PARAMS> = {}) => ({
   ...DEFAULT_FORGE_PARAMS,
   tier: 3 as const,
@@ -63,6 +73,18 @@ describe('taughtKeysFor（命令档 → 玩家白名单）', () => {
 })
 
 describe('generateSandboxLevel（闸门 + 回喂）', () => {
+  it('核心层钳制旋钮野值（HTML max 不拦手输）：maxLines=999 也按 FORGE_LIMITS 20 行拒', async () => {
+    const out = await generateSandboxLevel({
+      provider: stubProvider(21),
+      model: 'stub',
+      params: params({ maxLines: 999, maxCols: 999 }),
+      solve: solverWith(1),
+      makeId: () => 'sbx-x',
+      now: () => 0,
+      maxAttempts: 1,
+    })
+    expect(out).toMatchObject({ ok: false, kind: 'exhausted', reason: expect.stringContaining('1–20 行') })
+  })
   it('成功：演示 fixture + 9 键解（标准档 7–12）→ 入库形态完整', async () => {
     const out = await generateSandboxLevel({
       provider: createDemoProvider(),

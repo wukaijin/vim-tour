@@ -43,13 +43,20 @@ export const DIFFICULTY_LABEL: Record<ForgeDifficulty, string> = {
   hardcore: '硬核',
 }
 
+/**
+ * 关卡文本尺寸上限（单点定义）：旋钮 sanitize、UI input max、沙盒库入库 sanitize 三处同源。
+ * 2026-10-08 曾因入库层硬编码 12 行/80 列 < 旋钮上限，闸门放行的关卡入库被拒（「生成结果不合法，已丢弃」）——口径分叉，收敛于此。
+ */
+export const FORGE_LIMITS = { lines: 20, cols: 120 } as const
+export const FORGE_LIMITS_MIN = { lines: 1, cols: 16 } as const
+
 /** 生成旋钮（PLAN §14.1 三段） */
 export interface ForgeParams {
   tier: ForgeTier
   difficulty: ForgeDifficulty
-  /** 起止文本行数上限（2–8） */
+  /** 起止文本行数上限（1–20，见 FORGE_LIMITS） */
   maxLines: number
-  /** 每行字符上限（16–64） */
+  /** 每行字符上限（16–120，见 FORGE_LIMITS） */
   maxCols: number
   /** 题材自由文本（可空；不可验证但无害） */
   theme: string

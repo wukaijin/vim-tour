@@ -26,6 +26,7 @@ export const useForgeStore = defineStore('forge', () => {
     providerKind: 'demo',
     baseUrl: 'http://localhost:11434/v1',
     model: '',
+    maxTokens: 65_536,
     params: { ...DEFAULT_FORGE_PARAMS, ...DEMO_PARAMS },
   }
   // 重载不丢设置：服务/地址/模型名与生成旋钮都从本机设置恢复（非机密，透明存）
@@ -34,6 +35,7 @@ export const useForgeStore = defineStore('forge', () => {
   const providerKind = ref<ProviderKind>(initial.providerKind)
   const baseUrl = ref(initial.baseUrl)
   const model = ref(initial.model)
+  const maxTokens = ref(initial.maxTokens)
   if (providerKind.value === 'demo') {
     // 演示 provider 是固定 fixture，档位必须对齐（见下方 watch 同理）
     params.tier = DEMO_PARAMS.tier
@@ -71,12 +73,13 @@ export const useForgeStore = defineStore('forge', () => {
 
   // 设置变更即落盘（非机密项；key 的保管在 custody 里另走）
   watch(
-    [providerKind, baseUrl, model, () => ({ ...params })],
+    [providerKind, baseUrl, model, maxTokens, () => ({ ...params })],
     () => {
       saveForgeSettings(storage, {
         providerKind: providerKind.value,
         baseUrl: baseUrl.value,
         model: model.value,
+        maxTokens: maxTokens.value,
         params: { ...params },
       })
     },
@@ -104,7 +107,12 @@ export const useForgeStore = defineStore('forge', () => {
     if (providerKind.value === 'demo') return createDemoProvider({ failFirst: true })
     if (!model.value.trim()) throw new ForgeError('config', '未填写模型名')
     if (keyStored.value && custody.current() === null) throw new ForgeError('auth', '已保存的 key 尚未解锁')
-    return createOpenAIProvider({ baseUrl: baseUrl.value, model: model.value, apiKey: custody.current() ?? undefined })
+    return createOpenAIProvider({
+      baseUrl: baseUrl.value,
+      model: model.value,
+      apiKey: custody.current() ?? undefined,
+      maxTokens: maxTokens.value,
+    })
   }
 
   function pushDelta(d: ChatDeltaEvent): void {
@@ -268,6 +276,7 @@ export const useForgeStore = defineStore('forge', () => {
     providerKind,
     baseUrl,
     model,
+    maxTokens,
     keyInput,
     rememberKey,
     passphrase,

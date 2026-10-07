@@ -2,7 +2,7 @@ import { appendRepair, buildDraftMessages } from './prompt'
 import { extractJson, parseDraft } from './parse'
 import { keysFromDeclared, makeSandboxLevel, parRangeOf, pickPar, verifySolution } from './level'
 import type { Solver } from './level'
-import { toParKeys } from './types'
+import { FORGE_LIMITS, FORGE_LIMITS_MIN, toParKeys } from './types'
 import type { ForgeParams, SandboxLevel } from './types'
 import type { ForgeProvider } from './providers/types'
 
@@ -32,8 +32,15 @@ export type GenerateOutcome =
  */
 export async function generateSandboxLevel(opts: GenerateOptions): Promise<GenerateOutcome> {
   const maxAttempts = opts.maxAttempts ?? 3
-  const range = parRangeOf(opts.params)
-  let messages = buildDraftMessages(opts.params)
+  // 设置层可能存进手输的野值（HTML max 不拦键入）：核心层入口钳回合法域，
+  // 闸门与沙盒库入库上限（FORGE_LIMITS）才不会再分叉
+  const params: ForgeParams = {
+    ...opts.params,
+    maxLines: Math.min(FORGE_LIMITS.lines, Math.max(1, Math.floor(opts.params.maxLines))),
+    maxCols: Math.min(FORGE_LIMITS.cols, Math.max(FORGE_LIMITS_MIN.cols, Math.floor(opts.params.maxCols))),
+  }
+  const range = parRangeOf(params)
+  let messages = buildDraftMessages(params)
   let lastReason = '未生成'
   let attempts = 0
 
@@ -55,14 +62,14 @@ export async function generateSandboxLevel(opts: GenerateOptions): Promise<Gener
       messages = appendRepair(messages, text, lastReason)
       continue
     }
-    const parsed = parseDraft(raw, { maxLines: opts.params.maxLines, maxCols: opts.params.maxCols })
+    const parsed = parseDraft(raw, { maxLines: params.maxLines, maxCols: params.maxCols })
     if (!parsed.ok) {
       lastReason = parsed.reason
       messages = appendRepair(messages, text, lastReason)
       continue
     }
 
-    const keys = keysFromDeclared(opts.params.tier, parsed.draft.commands)
+    const keys = keysFromDeclared(params.tier, parsed.draft.commands)
     if (!keys.ok) {
       lastReason = keys.reason
       messages = appendRepair(messages, text, lastReason)
@@ -95,7 +102,7 @@ export async function generateSandboxLevel(opts: GenerateOptions): Promise<Gener
       solverKeys: keys.solverKeys,
       parKeys: toParKeys(picked.keys),
       parSource: picked.source,
-      params: opts.params,
+      params,
       model: opts.model,
       createdAt: opts.now(),
     })

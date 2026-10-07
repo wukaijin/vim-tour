@@ -1,4 +1,5 @@
 import type { ForgeDifficulty, ForgeParams, ForgeTierSetting, ProviderKind } from '../forge/types'
+import { FORGE_LIMITS, FORGE_LIMITS_MIN } from '../forge/types'
 import type { StorageLike } from './progress'
 
 /**
@@ -14,6 +15,8 @@ export interface ForgeSettings {
   providerKind: ProviderKind
   baseUrl: string
   model: string
+  /** 输出上限（max_tokens）：>0 显式发送；0 = 不发送交给服务端默认（PLAN §14.6 非机密设置） */
+  maxTokens: number
   params: ForgeSettingsParams
 }
 
@@ -42,13 +45,14 @@ export function loadForgeSettings(storage: StorageLike, defaults: ForgeSettings)
     providerKind: r.providerKind === 'openai' ? 'openai' : 'demo',
     baseUrl: str(r.baseUrl, 200) ?? defaults.baseUrl,
     model: str(r.model, 100) ?? defaults.model,
+    maxTokens: intIn(r.maxTokens, 0, 1_000_000, defaults.maxTokens),
     params: {
       tier: p.tier === 'random' || TIERS.includes(p.tier as number) ? (p.tier as ForgeTierSetting) : defaults.params.tier,
       difficulty: DIFFICULTIES.includes(p.difficulty as string)
         ? (p.difficulty as ForgeDifficulty)
         : defaults.params.difficulty,
-      maxLines: intIn(p.maxLines, 1, 8, defaults.params.maxLines),
-      maxCols: intIn(p.maxCols, 16, 64, defaults.params.maxCols),
+      maxLines: intIn(p.maxLines, FORGE_LIMITS_MIN.lines, FORGE_LIMITS.lines, defaults.params.maxLines),
+      maxCols: intIn(p.maxCols, FORGE_LIMITS_MIN.cols, FORGE_LIMITS.cols, defaults.params.maxCols),
       theme: str(p.theme, 120) ?? '',
     },
   }

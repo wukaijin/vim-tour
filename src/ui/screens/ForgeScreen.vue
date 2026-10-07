@@ -4,7 +4,7 @@ import { useGameStore } from '../stores/game'
 import { useForgeStore } from '../stores/forge'
 import Keycap from '../components/Keycap.vue'
 import KeyGlyph from '../components/KeyGlyph.vue'
-import { DIFFICULTY_LABEL, FORGE_TIERS, PAR_RANGE } from '../../forge/types'
+import { DIFFICULTY_LABEL, FORGE_LIMITS, FORGE_TIERS, PAR_RANGE } from '../../forge/types'
 import { parseKeys } from '../../engine'
 
 const game = useGameStore()
@@ -72,11 +72,11 @@ function onImportFile(e: Event): void {
         </label>
         <label class="knob">
           <span>行数上限</span>
-          <input v-model.number="forge.params.maxLines" type="number" min="1" max="8" />
+          <input v-model.number="forge.params.maxLines" type="number" min="1" :max="FORGE_LIMITS.lines" />
         </label>
         <label class="knob">
           <span>每行字符上限</span>
-          <input v-model.number="forge.params.maxCols" type="number" min="16" max="64" />
+          <input v-model.number="forge.params.maxCols" type="number" min="16" :max="FORGE_LIMITS.cols" />
         </label>
         <label class="knob full">
           <span>题材（可空）</span>
@@ -134,12 +134,19 @@ function onImportFile(e: Event): void {
               <span>服务地址</span>
               <input v-model="forge.baseUrl" type="text" placeholder="http://localhost:11434/v1" />
             </label>
-            <label class="knob full">
+            <label class="knob">
               <span>模型名</span>
               <input v-model="forge.model" type="text" placeholder="qwen2.5-coder:7b" />
             </label>
+            <label class="knob">
+              <span>输出上限（tokens）</span>
+              <input v-model.number="forge.maxTokens" class="narrow" type="number" min="0" max="1000000" step="1024" />
+            </label>
           </template>
         </div>
+        <p v-if="forge.providerKind === 'openai'" class="hint">
+          输出上限（max_tokens）默认 65536；0 = 不发送、交给服务端默认——Ollama 不传时落 num_predict 默认 128 会截断。
+        </p>
 
         <template v-if="forge.providerKind === 'openai'">
           <!-- 锁定态（已存 key 待解锁）：口令行常驻。原先挂在「记住」勾选下，
@@ -346,6 +353,11 @@ function onImportFile(e: Event): void {
 .knob input[type='number'],
 .row input[type='password'].mono {
   font-family: var(--font-mono);
+}
+
+/* 输出上限在 3fr 宽列里：数字框拉满整列显得空，收窄到与数值语义相称的宽度 */
+.knob input.narrow {
+  max-width: 160px;
 }
 
 /* —— 模型设置：生成台的次级折叠区块 ——

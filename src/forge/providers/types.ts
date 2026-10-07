@@ -62,6 +62,8 @@ export interface ProviderConfig {
   apiKey?: string
   /** 默认 300s：本地模型慢（PLAN §14.7）。非流式 = 整请求总时长；流式 = 无新数据的空闲超时（每帧重置） */
   timeoutMs?: number
+  /** 输出上限（max_tokens）：默认 65536 显式发送（Ollama 不传时落 num_predict 默认 128 会截断）；0 = 不发送交给服务端 */
+  maxTokens?: number
   /** response_format=json_object 的发送策略；auto = 先带，被 400/422 拒后去掉重试一次 */
   jsonMode?: 'auto' | 'on' | 'off'
 }

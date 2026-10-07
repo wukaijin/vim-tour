@@ -309,13 +309,13 @@ src/
 
 ### 14.6 模型接入与 key（无后端，§12 不破）
 - 单一 **OpenAI 兼容**适配器：base URL + 模型名 + 可选 key；默认本地（Ollama）→ **无 key 可用**；零新增依赖（`fetch` / `WebCrypto` 平台能力，不引 SDK、不引第三方脚本）。Anthropic/Gemini 型留第二适配器插槽（不进 M5）。
-- **非机密设置持久化**：服务类型 / 服务地址 / 模型名 / 生成旋钮存本机 `vim-tour:forge-settings`（重载不丢，sanitize 收敛越界值）；与 key 分离，任何情况下不含 key。
+- **非机密设置持久化**：服务类型 / 服务地址 / 模型名 / **输出上限（max_tokens，默认 65536 显式发送、上限可配 100 万——Ollama 不传时落 num_predict 默认 128 会截断；0 = 不发送交给服务端）** / 生成旋钮存本机 `vim-tour:forge-settings`（重载不丢，sanitize 收敛越界值）；与 key 分离，任何情况下不含 key。
 - **key 存储**：默认仅内存；可选「记住」= 口令 PBKDF2 派生 → AES-GCM 密文落 localStorage，派生密钥不落盘；非安全上下文（无 `crypto.subtle`）自动降级仅会话并明示；key 不进导出/日志/URL；UI 掩码 + 一键清除。
 - **威胁模型如实标注**：加密防的是本机顺手翻看与备份泄露；防不了 XSS 与恶意扩展（缓解 = 零第三方脚本 + 默认转义 + 出站仅配置的 base URL）。
 
 ### 14.7 生成 UX
 显式「生成」按钮 + 可见进度 + **可取消**；超时默认 300s（本地模型慢，可配）；失败分类文案（网络 / 鉴权 / 限流 / 响应不可解析 / 未收敛 / 求解超预算）；回喂重试可见「第 n 次尝试」；响应带 usage 时显示 token 用量。
-- **生成走 SSE 流式**（`stream: true`，fetch ReadableStream 手写解析，零依赖）：UI **尽力而为**展示「思考中 / 生成中」状态行与字数——thinking 字段无行业标准（DeepSeek 系 `reasoning_content`、OpenRouter `reasoning`、Ollama `thinking`），多字段尝试，取不到不显示、不作机制依赖）；**正文承载位置同样多字段尝试**（`delta.content` → `choices[0].message.content` → `choices[0].text`，首个出现者锁定——防「delta 增量 + 尾帧 message 汇总」双计），流里塞 `{"error":{…}}` 帧时透出服务给的真实原因；服务不理 stream 参数回整包 JSON 时按 content-type 嗅探降级非流式。流式下超时语义 = 无新数据的**空闲超时**（每帧重置，同一 timeoutMs），非流式仍为整请求总时长。
+- **生成走 SSE 流式**（`stream: true`，fetch ReadableStream 手写解析，零依赖）：UI **尽力而为**展示「思考中 / 生成中」状态行与字数——thinking 字段无行业标准（DeepSeek 系 `reasoning_content`、OpenRouter `reasoning`、Ollama `thinking`），多字段尝试，取不到不显示、不作机制依赖）；**正文承载位置同样多字段尝试**（`delta.content` → `choices[0].message.content` → `choices[0].text`，首个出现者锁定——防「delta 增量 + 尾帧 message 汇总」双计），流里塞 `{"error":{…}}` 帧时透出服务给的真实原因；撞输出上限（`finish_reason=length`）如实报截断并指向「输出上限」设置，不当「题目不合格」回喂重试；服务不理 stream 参数回整包 JSON 时按 content-type 嗅探降级非流式。流式下超时语义 = 无新数据的**空闲超时**（每帧重置，同一 timeoutMs），非流式仍为整请求总时长。
 - **原始输出折叠并标注剧透**：thinking 在推导解法、output 即含 parKeys 的题目 JSON，原文直出等于剧透答案——状态行只给进度感，原文进默认折叠的调试块（生成失败时留在页面上便于排查连接）。
 - **模型设置折叠为生成台内的次级区块**（`<details>`，默认收起）：默认服务是离线演示，多数人不需要改连接与 key；三张卡压成两张，一屏装得下。折叠标题行**必须自报当前服务**（provider + 模型 + 地址），不展开也知道在用哪个。
 - **原生控件必须装修**：`select` 去平台默认外观与箭头（`appearance: none` + CSS 画 chevron，零资源），底色与输入框统一；数字输入走 `IBM Plex Mono`（Nunito 的 1/7 与 0/8 难分辨，而这里恰是要盯着改的数字）；字段用定宽栅格而非裸 flex（裸排时字段宽度与内容语义零关联，读起来像没排版）。

@@ -1,4 +1,5 @@
 import type { ForgeDifficulty, ForgeTier, SandboxLevel, SandboxStats } from '../forge/types'
+import { FORGE_LIMITS } from '../forge/types'
 import type { LevelText } from '../game/types'
 import { detectStorage } from './progress'
 import type { StorageLike } from './progress'
@@ -174,10 +175,11 @@ function sanitizeText(v: unknown): LevelText | null {
 }
 
 function readLines(v: unknown): string[] | null {
-  if (!Array.isArray(v) || v.length < 1 || v.length > 12) return null
+  // 上限与生成旋钮同源（FORGE_LIMITS）：入库层比闸门窄会重演「闸门放行、入库被拒」的分叉
+  if (!Array.isArray(v) || v.length < 1 || v.length > FORGE_LIMITS.lines) return null
   const out: string[] = []
   for (const l of v) {
-    if (typeof l !== 'string' || l.length > 80) return null
+    if (typeof l !== 'string' || l.length > FORGE_LIMITS.cols) return null
     if (/[\u0000-\u001f\u007f]/.test(l)) return null
     out.push(l)
   }

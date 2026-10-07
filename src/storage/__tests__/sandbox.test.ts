@@ -10,6 +10,7 @@ import {
   withFreshIds,
 } from '../sandbox'
 import type { SandboxLevel } from '../../forge/types'
+import { FORGE_LIMITS } from '../../forge/types'
 import type { StorageLike } from '../progress'
 
 function memStorage(initial: Record<string, string> = {}): StorageLike & { dump(): Map<string, string> } {
@@ -139,6 +140,22 @@ describe('导出 / 导入（PLAN §14.4）', () => {
 })
 
 describe('sanitizeSandboxLevel', () => {
+  it('上限与生成旋钮同源（FORGE_LIMITS）：满尺寸关卡入库放行，超一被拒——锁「闸门放行、入库被拒」的分叉不再犯', () => {
+    // 2026-10-08 实犯：入库层硬编码 12 行/80 列 < 旋钮上限，17 行 YAML 关过闸门后入库被拒
+    const mk = (lines: number, cols: number): SandboxLevel => {
+      const row = 'x'.repeat(cols)
+      const start = Array.from({ length: lines }, () => row)
+      const target = [...start]
+      target[lines - 1] = 'y'.repeat(cols)
+      return level({ text: { start, target, cursor: { line: 0, col: 0 }, parKeys: 'x' } })
+    }
+    expect(sanitizeSandboxLevel(mk(FORGE_LIMITS.lines, FORGE_LIMITS.cols))).not.toBeNull()
+    expect(sanitizeSandboxLevel(mk(FORGE_LIMITS.lines + 1, FORGE_LIMITS.cols))).toBeNull()
+    expect(sanitizeSandboxLevel(mk(FORGE_LIMITS.lines, FORGE_LIMITS.cols + 1))).toBeNull()
+    const repo = createSandboxRepository(memStorage())
+    expect(repo.put(mk(FORGE_LIMITS.lines, FORGE_LIMITS.cols))).toBe(true)
+  })
+
   it('裁剪越界数值而不是整体拒绝（光标/成绩）', () => {
     const sane = sanitizeSandboxLevel(
       level({

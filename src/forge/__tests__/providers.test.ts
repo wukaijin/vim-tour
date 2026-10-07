@@ -284,6 +284,53 @@ describe('createOpenAIProvider（SSE 流式）', () => {
     expect(err).toMatchObject({ kind: 'bad-response' })
     expect((err as Error).message).toContain('model not found')
   })
+
+  it('max_tokens 三态：默认显式 65536（救 Ollama 落 num_predict=128）；0 不发送；自定义透传', async () => {
+    const bodies: string[] = []
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => {
+      bodies.push(String(_init?.body))
+      return okBody('{}')
+    })
+    const mk = (over: Partial<ProviderConfig>) =>
+      createOpenAIProvider(over as ProviderConfig, { fetchImpl: fetchImpl as unknown as typeof fetch })
+    await mk(cfg()).chat([])
+    await mk(cfg({ maxTokens: 0 })).chat([])
+    await mk(cfg({ maxTokens: 1_000_000 })).chat([])
+    expect(JSON.parse(bodies[0]!).max_tokens).toBe(65_536)
+    expect(JSON.parse(bodies[1]!)).not.toHaveProperty('max_tokens')
+    expect(JSON.parse(bodies[2]!).max_tokens).toBe(1_000_000)
+  })
+
+  it('流式撞输出上限（finish_reason=length）→ 如实报截断，不当「题目不合格」回喂重试', async () => {
+    const p = createOpenAIProvider(cfg({ maxTokens: 512 }), {
+      fetchImpl: (async () =>
+        sseResponse([
+          contentFrame('{"title":"断在半截'),
+          frame({ choices: [{ delta: {}, finish_reason: 'length' }] }),
+          DONE,
+        ])) as unknown as typeof fetch,
+    })
+    const err = await p.chat([], { onDelta: () => {} }).catch((e: unknown) => e)
+    expect(err).toMatchObject({ kind: 'bad-response' })
+    expect((err as Error).message).toContain('512')
+    expect((err as Error).message).toContain('length')
+  })
+
+  it('非流式 finish_reason=length 同样检测（0 = 未发送上限时文案指向服务端）', async () => {
+    const mk = (maxTokens: number) =>
+      createOpenAIProvider(cfg({ maxTokens }), {
+        fetchImpl: (async () =>
+          new Response(JSON.stringify({ choices: [{ message: { content: 'x' }, finish_reason: 'length' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })) as unknown as typeof fetch,
+      })
+    const withCap = await mk(4096).chat([]).catch((e: unknown) => e)
+    expect((withCap as Error).message).toContain('4096')
+    const noCap = await mk(0).chat([]).catch((e: unknown) => e)
+    expect((noCap as Error).message).toContain('服务端')
+    expect(noCap).toMatchObject({ kind: 'bad-response' })
+  })
 })
 
 describe('createDemoProvider（离线演示）', () => {

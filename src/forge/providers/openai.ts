@@ -21,6 +21,7 @@ export function createOpenAIProvider(config: ProviderConfig, deps: OpenAIProvide
   const fetchImpl = deps.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args))
   const timeoutMs = config.timeoutMs ?? 300_000
   const jsonMode = config.jsonMode ?? 'auto'
+  const maxTokens = config.maxTokens === undefined ? 65_536 : Math.max(0, Math.floor(config.maxTokens))
   const url = chatCompletionsUrl(config.baseUrl)
 
   function request(messages: ChatMessage[], signal: AbortSignal, mode: { stream: boolean; json: boolean }): Promise<Response> {
@@ -28,6 +29,8 @@ export function createOpenAIProvider(config: ProviderConfig, deps: OpenAIProvide
     if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`
     const body: Record<string, unknown> = { model: config.model, messages, temperature: 0.7, stream: mode.stream }
     if (mode.json) body.response_format = { type: 'json_object' }
+    // 显式带上限：Ollama 不传 max_tokens 时落 num_predict 默认 128，thinking 模型连思考都装不下
+    if (maxTokens > 0) body.max_tokens = maxTokens
     return fetchImpl(url, { method: 'POST', headers, body: JSON.stringify(body), signal })
   }
 
@@ -83,12 +86,13 @@ export function createOpenAIProvider(config: ProviderConfig, deps: OpenAIProvide
         if (wantStream && res.body && (res.headers.get('content-type') ?? '').includes('text/event-stream')) {
           streamAlive = true
           try {
-            return await readSseChat(res, opts!.onDelta!, arm)
+            return await readSseChat(res, opts!.onDelta!, arm, maxTokens)
           } catch (e) {
             throw classify(e)
           }
         }
         const data: unknown = await res.json().catch(() => null)
+        if (finishReasonOf(data) === 'length') throw truncatedError(maxTokens)
         const text = contentOf(data)
         if (text === null) throw new ForgeError('bad-response', '响应里没有 choices[0].message.content')
         return { text, usage: usageOf(data) }
@@ -109,12 +113,14 @@ async function readSseChat(
   res: Response,
   onDelta: (delta: ChatDeltaEvent) => void,
   onFrame: () => void,
+  maxTokens: number,
 ): Promise<ChatResult> {
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buf = ''
   let content = ''
   let usage: ChatUsage | undefined
+  let lengthHit = false
   // 正文承载位置不一定在 delta.content（部分兼容层/legacy 网关用 message.content 或 completions 式 text）；
   // 首个出现正文的字段一经出现即锁定——防「delta 增量 + 尾帧 message 汇总」双计
   let contentField: 'delta' | 'message' | 'text' | null = null
@@ -129,13 +135,14 @@ async function readSseChat(
       return // 坏帧跳过，不毒化整次响应
     }
     const o = obj as {
-      choices?: Array<{ delta?: Record<string, unknown>; message?: { content?: unknown }; text?: unknown }>
+      choices?: Array<{ delta?: Record<string, unknown>; message?: { content?: unknown }; text?: unknown; finish_reason?: unknown }>
       error?: { message?: unknown }
     }
     // 部分服务出错不开 4xx：200 开流后在帧里塞 {"error":{…}}——透出真实原因，别落到「没有内容增量」
     if (o.error) throw new ForgeError('bad-response', firstString(o.error.message) ?? '服务在流式响应里报了错')
     const choice = o.choices?.[0]
     if (choice) {
+      if (choice.finish_reason === 'length') lengthHit = true
       const delta = choice.delta
       if (delta) {
         const think = firstString(delta.reasoning_content, delta.reasoning, delta.thinking)
@@ -170,8 +177,23 @@ async function readSseChat(
     }
   }
   handleLine(buf.replace(/\r$/, '') + decoder.decode()) // 尾行无换行 + 解码器余量
+  // 撞 token 上限的截断不是「题目不合格」，重试也只会同样截断——直接如实报错
+  if (lengthHit) throw truncatedError(maxTokens)
   if (content === '') throw new ForgeError('bad-response', '流式响应里没有内容增量')
   return { text: content, usage }
+}
+
+function truncatedError(maxTokens: number): ForgeError {
+  return new ForgeError(
+    'bad-response',
+    maxTokens > 0
+      ? `输出在 ${maxTokens} token 上限处被截断（finish_reason=length）——调大「输出上限」再试`
+      : '输出被服务端截断（finish_reason=length）——本次未发送 max_tokens，服务端有自己的输出上限（Ollama 为 num_predict 默认 128）',
+  )
+}
+
+function finishReasonOf(data: unknown): unknown {
+  return (data as { choices?: Array<{ finish_reason?: unknown }> } | null)?.choices?.[0]?.finish_reason
 }
 
 function firstString(...vals: unknown[]): string | undefined {
